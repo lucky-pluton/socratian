@@ -128,11 +128,11 @@ export interface TopicLearningProgress {
   misconceptions: string[];
   pending_followup: boolean;
   pending_followup_type:
-    | 'reasoning'
-    | 'partial'
-    | 'misconception'
-    | 'unrelated_doubt'
-    | null;
+  | 'reasoning'
+  | 'partial'
+  | 'misconception'
+  | 'unrelated_doubt'
+  | null;
   struggle_count: number;
   next_question: number;
   stage_summaries: Record<string, string>;

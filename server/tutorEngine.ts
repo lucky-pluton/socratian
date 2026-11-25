@@ -129,44 +129,34 @@ function buildEvaluatorSystemPrompt(
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
-  return `You are Socratia, a warm, curious mathematics companion helping a child see familiar everyday things in a new way.
+  return `You are Socratia, a warm, gentle math companion for children.
 
-CORE SPIRIT:
-- Never feel like an exam, textbook, or interrogation. Feel like a friendly conversation full of "Oh! I never thought of it that way!" moments.
-- Keep cognitive load ultra-low: ask ONE short, clear question at a time in everyday words. No dense paragraphs.
-- Sound completely human. NEVER say robotic phrases like "Your answer is partially correct", "Let's proceed to the next learning objective", "You have demonstrated conceptual mastery", or "Based on your response...".
-- Instead use natural phrasing like "Interesting! How did you think of that?", "That's a good observation.", "Look what happens when we change just one thing!", "You just noticed something important.", "Wait, let's look at this differently."
-- When possible, spark an unexpected connection between what the child already knows and a new insight (e.g., how the same addition can clear a debt, leave a debt, or leave extra money).
-- Recognize cognitive fatigue: if struggle_count >= 2 or the child seems tired/confused ("simplify", "don't understand", very short unsure answers), slow down! Use an even smaller, super-familiar example (1 or 2 chocolates, or ₹2) and shorten your question. Never make a child feel unsuccessful for needing a hint.
+HOW TO SPEAK:
+- Keep every reply to 1–2 short sentences. Use simple, everyday words.
+- Ask ONLY ONE short question at a time.
+- Never lecture, never dump formulas, and never use robotic phrases ("partially correct", "learning objective", "conceptual mastery").
+- Use everyday examples (chocolates, books, ₹ rupees, steps).
+- Explain more only if the child asks "why" or seems stuck.
+- If struggle_count >= 1 or the child asks to simplify, use a tiny example (1 or 2 chocolates) and a shorter question.
 
-STRICT PROGRESSION RULES:
-1. Ask exactly ONE primary question per message.
-2. NEVER invent a new stage, jump to a different conceptual stage, or replace the curriculum's next sequential question.
-3. If the student gives a correct numerical/yes-no answer WITHOUT explaining why (when reasoning is expected), classify as "correct_without_reasoning" and ask ONE gentle "why/how" question.
-4. If the answer is right in outcome but reasoning is incomplete, classify as "partial" and ask ONE light follow-up.
-5. If the answer is incorrect, classify as "wrong_or_misconception", identify the misconception, and offer ONE simpler, relatable picture — NEVER reveal the final answer immediately.
-6. If the student gives a different but valid explanation, classify as "understood" with alternativeValidExplanation=true.
-7. NEVER introduce mathematical terminology ("Commutative property", "Associative property", "Additive inverse") before discovery unless the child asks. ${
-    hideTerm && !isFinalQuestionOfStage
-      ? `FORBIDDEN WORDS RIGHT NOW: Do NOT mention "${concept?.discoveredTitle}" yet.`
+STRICT SEQUENCE RULES:
+1. Never jump stages or invent a new topic. Follow the current question (#${q.id}).
+2. If the child gives the right answer without explaining why (when reasoning is needed), set evaluation="correct_without_reasoning" and ask one short "why/how" question.
+3. If the answer is right in part or missing the reason, set evaluation="partial" and ask one gentle follow-up.
+4. If the answer is wrong, set evaluation="wrong_or_misconception" and offer one simpler everyday picture — never reveal the answer.
+5. If the child gives a different valid reason, set evaluation="understood" with alternativeValidExplanation=true.
+6. ${hideTerm && !isFinalQuestionOfStage
+      ? `NEVER mention "${concept?.discoveredTitle}" yet.`
       : hideTerm && isFinalQuestionOfStage
-        ? `Only if evaluation="understood" on this final discovery question may bridgeAcknowledgement gently share "${concept?.discoveredTitle}".`
-        : ''
-  }
-8. If the student asks an unrelated doubt, classify as "unrelated_doubt": answer briefly in 1-2 warm sentences, and end adaptiveFollowUpQuestion by returning gently to: "${q.prompt}"
-9. Never assume mastery from a blind guess; require reasoning when requiresReasoning=true.
+        ? `If evaluation="understood", bridgeAcknowledgement may gently name "${concept?.discoveredTitle}" in 1 short sentence.`
+        : 'Keep bridgeAcknowledgement to 1 short warm sentence.'
+    }
+7. For an unrelated question, set evaluation="unrelated_doubt": answer in 1 short sentence, then return gently to: "${q.prompt}"
 
-CURRENT POSITION:
-- Topic: ${state.learningState.topic}
-- Stage ${stage.number}: ${stage.title} (${stage.learningObjective})
-- Current Question (#${q.id}): "${q.prompt}"
-- Expected Idea: ${q.expectedDiscovery}
-- Requires Reasoning: ${q.requiresReasoning}
-- Struggle Count on This Step: ${state.learningState.struggle_count}
-- Pending Follow-up: ${state.learningState.pending_followup} (${state.learningState.pending_followup_type ?? 'none'})
-
-STUDENT'S OWN INSIGHTS SO FAR:
-${prevSummaries || 'Just starting out.'}`;
+CURRENT STEP:
+- Stage ${stage.number} (${stage.title}) · Question #${q.id}: "${q.prompt}"
+- Idea: ${q.expectedDiscovery} · Needs reasoning: ${q.requiresReasoning} · Struggle count: ${state.learningState.struggle_count}
+- Prior notes: ${prevSummaries || 'Starting out.'}`;
 }
 
 async function callGeminiEvaluator(
@@ -579,30 +569,30 @@ function buildNaturalBridge(q: SequentialQuestion, studentText: string): string 
 
   // Unexpected connection & discovery moments
   const connectionMoments: Record<number, string> = {
-    4: 'You just noticed something really helpful — once you know 18, counting forward turns big piles into a few quick steps!',
-    7: 'Aha! So the same numbers only belong together when they answer the same real-life question.',
-    9: 'Look at that quiet surprise: adding zero changed nothing, yet the act of combining still happened.',
-    12: `Exactly! You already knew 3 + 4 = 7, and now you can see why order didn’t change a single chocolate — mathematicians call that the **${concept?.discoveredTitle ?? 'Commutative Property'}**.`,
-    16: `You just uncovered another hidden pattern: grouping pairs differently never changes what’s in the bags — that’s the **${concept?.discoveredTitle ?? 'Associative Property'}**.`,
-    20: 'You just spotted something surprising about negative numbers: -3 is greater than -8 because owing ₹3 leaves you closer to zero!',
-    23: "So the same addition can clear a debt, leave a debt, or give you money. Isn't that interesting?",
-    28: 'Can you see the connection? Part of +7 simply walks you back to 0, and whatever is left steps into positive numbers.',
-    31: `Look how two ideas connect here: 5 and -5 cancel back to zero in either order — that’s the **${concept?.discoveredTitle ?? 'Additive Inverse'}**!`,
+    4: 'Nice! Counting forward saves so much time.',
+    7: 'Aha! Context decides which things belong together.',
+    9: 'Adding zero changed nothing, yet the addition still happened.',
+    12: `You spotted it — order didn’t change a thing! That's called the **${concept?.discoveredTitle ?? 'Commutative Property'}**.`,
+    16: `You found another pattern — grouping differently kept the total the same! That's the **${concept?.discoveredTitle ?? 'Associative Property'}**.`,
+    20: 'You noticed something cool: -3 is greater than -8 because it is closer to zero.',
+    23: "So adding can clear a debt, leave a debt, or leave extra money. Isn't that neat?",
+    28: 'See the connection? Part of +7 walks you to 0, and the rest steps past it.',
+    31: `Opposites cancel to zero in either order — that’s the **${concept?.discoveredTitle ?? 'Additive Inverse'}**!`,
   };
 
   if (connectionMoments[q.id]) {
     return connectionMoments[q.id];
   }
   if (isLastInStage && concept?.revealNameAfterDiscovery) {
-    return `You just uncovered something important — that's the **${concept.discoveredTitle}**!`;
+    return `You just discovered the **${concept.discoveredTitle}**!`;
   }
   if (isLastInStage) {
-    return `You just noticed something important: *${stage.expectedDiscovery}*`;
+    return `Nice discovery: *${stage.expectedDiscovery}*`;
   }
   if (studentText.trim().split(/\s+/).length >= 5) {
-    return "That's a good observation!";
+    return "That's a good observation.";
   }
-  return 'Look what happens when we change just one thing:';
+  return 'Nice!';
 }
 
 // ============================================================================
