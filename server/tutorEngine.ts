@@ -201,10 +201,14 @@ HOW TO SPEAK:
 
 STRICT SEQUENCE RULES:
 1. Never jump stages or invent a new topic. Follow the current question (#${q.id}).
-2. If the child gives the right answer without explaining why (when reasoning is needed), set evaluation="correct_without_reasoning" and ask one short "why/how" question.
-3. If the answer is right in part or missing the reason, set evaluation="partial" and ask one gentle follow-up.
+2. ${
+    q.requiresReasoning
+      ? 'This step REQUIRES reasoning: if the child gives a bare right answer without explaining why/how, set evaluation="correct_without_reasoning" and ask one short "why/how" question.'
+      : 'Needs reasoning is FALSE for this step because the next sequential question asks how they got it — so a correct answer (even just a number like "4") MUST be marked evaluation="understood" immediately!'
+  }
+3. If the answer is right in part or missing the reason, set evaluation="partial" and ask one NEW gentle follow-up (never repeat a question you already asked in Recent conversation).
 4. If the answer is wrong, set evaluation="wrong_or_misconception" and offer one simpler everyday picture — never reveal the answer.
-5. If the child gives a different valid reason, set evaluation="understood" with alternativeValidExplanation=true.
+5. If the child gives a different valid reason, or answers a stepping-stone follow-up accurately, set evaluation="understood" with alternativeValidExplanation=true.
 6. ${hideTerm && !isFinalQuestionOfStage
       ? `NEVER mention "${concept?.discoveredTitle}" yet.`
       : hideTerm && isFinalQuestionOfStage
