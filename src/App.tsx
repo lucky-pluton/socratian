@@ -22,6 +22,7 @@ import type {
   ChallengeItem,
   ConceptDefinition,
   JournalEntry,
+  SequentialQuestion,
   StageDefinition,
   StageId,
   StudentState,
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [stages, setStages] = useState<StageDefinition[]>([]);
   const [concepts, setConcepts] = useState<ConceptDefinition[]>([]);
+  const [questions, setQuestions] = useState<SequentialQuestion[]>([]);
   const [badges, setBadges] = useState<BadgeDefinition[]>([]);
   const [state, setState] = useState<StudentState | null>(null);
   const [dailyChallenge, setDailyChallenge] = useState<ChallengeItem | null>(null);
@@ -55,6 +57,7 @@ export const App: React.FC = () => {
       ]);
       setStages(curr.stages);
       setConcepts(curr.concepts);
+      setQuestions(curr.questions);
       setBadges(curr.badges);
       setState(st.state);
       setDailyChallenge(st.dailyChallenge);
@@ -226,6 +229,7 @@ export const App: React.FC = () => {
           state={state}
           stages={stages}
           concepts={concepts}
+          questions={questions}
           loading={tutorLoading}
           error={tutorError}
           onSelectStage={(sid) => void handleSelectStage(sid)}

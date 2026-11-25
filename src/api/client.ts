@@ -3,6 +3,7 @@ import type {
   ChallengeItem,
   ConceptDefinition,
   JournalEntry,
+  SequentialQuestion,
   StageDefinition,
   StageId,
   StudentState,
@@ -42,6 +43,7 @@ function cacheState(state: StudentState) {
 export interface CurriculumPayload {
   stages: StageDefinition[];
   concepts: ConceptDefinition[];
+  questions: SequentialQuestion[];
   badges: BadgeDefinition[];
 }
 
@@ -73,6 +75,8 @@ export async function fetchState(studentId: string): Promise<StatePayload> {
   if (
     cached &&
     cached.studentId === studentId &&
+    cached.learningState &&
+    Array.isArray(cached.learningState.completed_questions) &&
     res.state.persistenceMode === 'local' &&
     res.state.messages.length <= 1 &&
     cached.messages.length > 1

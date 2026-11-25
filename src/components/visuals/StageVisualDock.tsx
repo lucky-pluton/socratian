@@ -20,19 +20,19 @@ export const StageVisualDock: React.FC<StageVisualDockProps> = ({
   stageId,
   visualHint,
 }) => {
-  const hintType =
-    visualHint?.type ??
-    (stageId === 'stage-1'
-      ? 'chocolates'
-      : stageId === 'stage-2'
-        ? 'context_blocks'
-        : stageId === 'stage-3'
-          ? 'bank_ledger'
-          : stageId === 'stage-4'
-            ? 'number_line'
-            : stageId === 'stage-5'
-              ? 'property_tiles'
-              : 'elevation_temp');
+  const fallbackByStage: Record<StageId, VisualHint['type']> = {
+    'stage-1': 'chocolates',
+    'stage-2': 'context_blocks',
+    'stage-3': 'chocolates',
+    'stage-4': 'property_tiles',
+    'stage-5': 'property_tiles',
+    'stage-6': 'bank_ledger',
+    'stage-7': 'bank_ledger',
+    'stage-8': 'number_line',
+    'stage-9': 'bank_ledger',
+    'stage-10': 'elevation_temp',
+  };
+  const hintType = visualHint?.type ?? fallbackByStage[stageId] ?? 'chocolates';
 
   if (hintType === 'number_line') {
     return (

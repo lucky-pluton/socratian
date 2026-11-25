@@ -4,7 +4,11 @@ export type StageId =
   | 'stage-3'
   | 'stage-4'
   | 'stage-5'
-  | 'stage-6';
+  | 'stage-6'
+  | 'stage-7'
+  | 'stage-8'
+  | 'stage-9'
+  | 'stage-10';
 
 export type ConceptStatus = 'undiscovered' | 'exploring' | 'discovered';
 
@@ -54,6 +58,7 @@ export interface TutorAssessment {
 export interface ConversationMessage {
   id: string;
   stageId: StageId;
+  questionId?: number;
   role: 'tutor' | 'student';
   content: string;
   assessment?: TutorAssessment;
@@ -73,16 +78,63 @@ export interface ConceptDefinition {
   keyMisconceptions: string[];
 }
 
+export interface MisconceptionRule {
+  id: string;
+  label: string;
+  keywords: string[];
+  wrongNumbers?: number[];
+  simplerExamplePrompt: string;
+}
+
+export interface SequentialQuestion {
+  id: number;
+  stageId: StageId;
+  stageNumber: number;
+  conceptId: string;
+  prompt: string;
+  learningObjective: string;
+  expectedDiscovery: string;
+  requiresReasoning: boolean;
+  acceptedNumbers?: number[];
+  acceptedBoolean?: 'yes' | 'no';
+  reasoningKeywords: string[];
+  misconceptions: MisconceptionRule[];
+  adaptiveHint: string;
+  visualHint: VisualHint;
+}
+
 export interface StageDefinition {
   id: StageId;
   number: number;
   title: string;
   subtitle: string;
   description: string;
+  learningObjective: string;
+  expectedDiscovery: string;
+  progressionCriteria: string;
   openingQuestion: string;
   openingVisualHint: VisualHint;
   accentColor: string;
   conceptIds: string[];
+  questionIds: number[];
+}
+
+export interface TopicLearningProgress {
+  topic: string;
+  current_stage: number;
+  current_question: number;
+  completed_questions: number[];
+  mastered_concepts: string[];
+  misconceptions: string[];
+  pending_followup: boolean;
+  pending_followup_type:
+    | 'reasoning'
+    | 'partial'
+    | 'misconception'
+    | 'unrelated_doubt'
+    | null;
+  next_question: number;
+  stage_summaries: Record<string, string>;
 }
 
 export interface ConceptProgress {
@@ -131,7 +183,10 @@ export interface ChallengeItem {
 export interface StudentState {
   studentId: string;
   name: string;
+  activeTopic: string;
   currentStageId: StageId;
+  learningState: TopicLearningProgress;
+  topicStates: Record<string, TopicLearningProgress>;
   curiosityStreak: number;
   lastActiveDate: string;
   reasoningScore: number;

@@ -5,12 +5,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type {
   ConceptProgress,
   ConversationMessage,
-  EarnedBadge,
-  JournalEntry,
   StageId,
   StudentState,
+  TopicLearningProgress,
 } from '../src/types/socratic.js';
-import { CONCEPTS, STAGES, getStageById } from './curriculum.js';
+import {
+  CONCEPTS,
+  DEFAULT_TOPIC,
+  STAGES,
+  createInitialTopicProgress,
+  getQuestionById,
+  getStageById,
+} from './curriculum.js';
 
 const DATA_DIR = process.env.VERCEL
   ? path.join(os.tmpdir(), 'socratia-data')
@@ -45,7 +51,7 @@ function buildInitialConceptProgress(): Record<string, ConceptProgress> {
   for (const concept of CONCEPTS) {
     map[concept.id] = {
       conceptId: concept.id,
-      status: concept.id === 'need-for-addition' ? 'exploring' : 'undiscovered',
+      status: concept.id === 'combining_quantities' ? 'exploring' : 'undiscovered',
       mastery: 0,
       studentExplanation: null,
       activeMisconception: null,
@@ -55,13 +61,22 @@ function buildInitialConceptProgress(): Record<string, ConceptProgress> {
   return map;
 }
 
-export function createDefaultStudent(studentId: string, name = 'Explorer'): Omit<StudentState, 'aiMode' | 'persistenceMode'> {
+export function createDefaultStudent(
+  studentId: string,
+  name = 'Explorer'
+): Omit<StudentState, 'aiMode' | 'persistenceMode'> {
   const firstStage = STAGES[0];
+  const firstQuestion = getQuestionById(1);
   const now = new Date().toISOString();
+  const initialTopic = createInitialTopicProgress(DEFAULT_TOPIC);
+
   return {
     studentId,
     name,
+    activeTopic: DEFAULT_TOPIC,
     currentStageId: 'stage-1',
+    learningState: initialTopic,
+    topicStates: { [DEFAULT_TOPIC]: initialTopic },
     curiosityStreak: 1,
     lastActiveDate: getTodayKey(),
     reasoningScore: 0,
@@ -74,11 +89,12 @@ export function createDefaultStudent(studentId: string, name = 'Explorer'): Omit
     conceptProgress: buildInitialConceptProgress(),
     messages: [
       {
-        id: `msg-init-${firstStage.id}`,
+        id: `msg-init-${firstStage.id}-q${firstQuestion.id}`,
         stageId: firstStage.id,
+        questionId: firstQuestion.id,
         role: 'tutor',
-        content: firstStage.openingQuestion,
-        visualHint: firstStage.openingVisualHint,
+        content: firstQuestion.prompt,
+        visualHint: firstQuestion.visualHint,
         createdAt: now,
       },
     ],
@@ -96,6 +112,31 @@ export function createDefaultStudent(studentId: string, name = 'Explorer'): Omit
     ],
     badges: [],
   };
+}
+
+function normalizeStudent(
+  student: Omit<StudentState, 'aiMode' | 'persistenceMode'>
+): Omit<StudentState, 'aiMode' | 'persistenceMode'> {
+  const defaults = buildInitialConceptProgress();
+  for (const [k, v] of Object.entries(defaults)) {
+    if (!student.conceptProgress[k]) {
+      student.conceptProgress[k] = v;
+    }
+  }
+  if (!student.activeTopic) {
+    student.activeTopic = DEFAULT_TOPIC;
+  }
+  if (!student.topicStates) {
+    student.topicStates = {};
+  }
+  if (!student.learningState) {
+    student.learningState = createInitialTopicProgress(student.activeTopic);
+  }
+  if (!student.learningState.stage_summaries) {
+    student.learningState.stage_summaries = {};
+  }
+  student.topicStates[student.activeTopic] = student.learningState;
+  return student;
 }
 
 function ensureLocalStore(): PersistedData {
@@ -184,10 +225,20 @@ export async function loadStudentState(
         };
       }
 
-      const loaded: Omit<StudentState, 'aiMode' | 'persistenceMode'> = {
+      const learningState: TopicLearningProgress =
+        (profile.learning_state as TopicLearningProgress | null) ??
+        createInitialTopicProgress(DEFAULT_TOPIC);
+
+      const loaded = normalizeStudent({
         studentId,
         name: profile.name,
+        activeTopic: learningState.topic || DEFAULT_TOPIC,
         currentStageId: profile.current_stage_id as StageId,
+        learningState,
+        topicStates:
+          (profile.topic_states as Record<string, TopicLearningProgress> | null) ?? {
+            [learningState.topic || DEFAULT_TOPIC]: learningState,
+          },
         curiosityStreak: profile.curiosity_streak,
         lastActiveDate: profile.last_active_date,
         reasoningScore: profile.reasoning_score,
@@ -195,7 +246,9 @@ export async function loadStudentState(
         misconceptionsResolved: profile.misconceptions_resolved,
         explanationsGiven: profile.explanations_given,
         patternsDiscovered: CONCEPTS.filter(
-          (c) => c.stageId === 'stage-5' && conceptProgress[c.id]?.status === 'discovered'
+          (c) =>
+            (c.stageId === 'stage-4' || c.stageId === 'stage-5' || c.stageId === 'stage-9') &&
+            conceptProgress[c.id]?.status === 'discovered'
         ).length,
         dailyChallengeCompletedDate: profile.daily_challenge_completed_date,
         weeklyChallengeCompleted: profile.weekly_challenge_completed,
@@ -203,6 +256,7 @@ export async function loadStudentState(
         messages: (messages ?? []).map((m) => ({
           id: m.id,
           stageId: m.stage_id as StageId,
+          questionId: m.question_id ?? undefined,
           role: m.role as 'tutor' | 'student',
           content: m.content,
           assessment: m.assessment ?? undefined,
@@ -222,7 +276,7 @@ export async function loadStudentState(
           badgeId: b.badge_id,
           earnedAt: b.earned_at,
         })),
-      };
+      });
       updateStreak(loaded);
       return { ...loaded, aiMode, persistenceMode: 'supabase' };
     } catch (err) {
@@ -235,18 +289,12 @@ export async function loadStudentState(
   if (!student) {
     student =
       fallbackState && fallbackState.studentId === studentId
-        ? fallbackState
+        ? normalizeStudent(fallbackState)
         : createDefaultStudent(studentId);
     store.students[studentId] = student;
     writeLocalStore(store);
   } else {
-    // Ensure any newly added concepts exist in map
-    const defaults = buildInitialConceptProgress();
-    for (const [k, v] of Object.entries(defaults)) {
-      if (!student.conceptProgress[k]) {
-        student.conceptProgress[k] = v;
-      }
-    }
+    student = normalizeStudent(student);
     updateStreak(student);
     writeLocalStore(store);
   }
@@ -266,6 +314,8 @@ async function saveStudentStateToSupabase(
     id: student.studentId,
     name: student.name,
     current_stage_id: student.currentStageId,
+    learning_state: student.learningState,
+    topic_states: student.topicStates,
     curiosity_streak: student.curiosityStreak,
     last_active_date: student.lastActiveDate,
     reasoning_score: student.reasoningScore,
@@ -294,6 +344,7 @@ async function saveStudentStateToSupabase(
     id: m.id,
     student_id: student.studentId,
     stage_id: m.stageId,
+    question_id: m.questionId ?? null,
     role: m.role,
     content: m.content,
     assessment: m.assessment ?? null,
@@ -330,6 +381,7 @@ async function saveStudentStateToSupabase(
 
 export async function saveStudentState(state: StudentState): Promise<void> {
   const { aiMode: _ai, persistenceMode: _pm, ...clean } = state;
+  clean.topicStates[clean.activeTopic] = clean.learningState;
   const sb = getSupabase();
   if (sb) {
     try {
@@ -368,24 +420,41 @@ export async function resetStudentState(
   return { ...fresh, aiMode, persistenceMode: 'local' };
 }
 
-export function ensureStageOpeningMessage(state: StudentState, stageId: StageId): ConversationMessage | null {
-  const hasStageMsgs = state.messages.some((m) => m.stageId === stageId);
-  if (hasStageMsgs) return null;
+export function syncLearningPositionToStage(
+  state: StudentState,
+  stageId: StageId
+): ConversationMessage | null {
   const stage = getStageById(stageId);
-  const msg: ConversationMessage = {
-    id: `msg-init-${stage.id}-${Date.now()}`,
-    stageId: stage.id,
-    role: 'tutor',
-    content: stage.openingQuestion,
-    visualHint: stage.openingVisualHint,
-    createdAt: new Date().toISOString(),
-  };
-  state.messages.push(msg);
+  state.currentStageId = stage.id;
+  state.learningState.current_stage = stage.number;
 
-  // Mark the first concept of this stage as exploring if still undiscovered
+  // Pick first uncompleted question in this stage, or first question if stage already done
+  const completedSet = new Set(state.learningState.completed_questions);
+  const targetQId =
+    stage.questionIds.find((qid) => !completedSet.has(qid)) ?? stage.questionIds[0];
+  state.learningState.current_question = targetQId;
+  state.learningState.next_question = targetQId;
+  state.learningState.pending_followup = false;
+  state.learningState.pending_followup_type = null;
+
   const firstConcept = stage.conceptIds[0];
   if (firstConcept && state.conceptProgress[firstConcept]?.status === 'undiscovered') {
     state.conceptProgress[firstConcept].status = 'exploring';
   }
+
+  const hasStageMsgs = state.messages.some((m) => m.stageId === stageId);
+  if (hasStageMsgs) return null;
+
+  const q = getQuestionById(targetQId);
+  const msg: ConversationMessage = {
+    id: `msg-init-${stage.id}-q${q.id}-${Date.now()}`,
+    stageId: stage.id,
+    questionId: q.id,
+    role: 'tutor',
+    content: q.prompt,
+    visualHint: q.visualHint,
+    createdAt: new Date().toISOString(),
+  };
+  state.messages.push(msg);
   return msg;
 }

@@ -7,16 +7,17 @@ import { z } from 'zod';
 import {
   BADGES,
   CONCEPTS,
+  SEQUENTIAL_QUESTIONS,
   STAGES,
   getDailyChallenge,
   getWeeklyChallenge,
 } from './curriculum.js';
 import {
-  ensureStageOpeningMessage,
   getTodayKey,
   loadStudentState,
   resetStudentState,
   saveStudentState,
+  syncLearningPositionToStage,
 } from './storage.js';
 import { hasGeminiKey, runSocraticTurn } from './tutorEngine.js';
 import type { StageId } from '../src/types/socratic.js';
@@ -25,6 +26,19 @@ export const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+const StageIdSchema = z.enum([
+  'stage-1',
+  'stage-2',
+  'stage-3',
+  'stage-4',
+  'stage-5',
+  'stage-6',
+  'stage-7',
+  'stage-8',
+  'stage-9',
+  'stage-10',
+]);
 
 function getAiMode(): 'gemini' | 'demo' {
   return hasGeminiKey() ? 'gemini' : 'demo';
@@ -45,6 +59,7 @@ app.get('/api/curriculum', (_req, res) => {
   res.json({
     stages: STAGES,
     concepts: CONCEPTS,
+    questions: SEQUENTIAL_QUESTIONS,
     badges: BADGES,
   });
 });
@@ -67,16 +82,19 @@ app.get('/api/state', async (req, res) => {
 
 const StageSwitchSchema = z.object({
   studentId: z.string().min(1),
-  stageId: z.enum(['stage-1', 'stage-2', 'stage-3', 'stage-4', 'stage-5', 'stage-6']),
+  stageId: StageIdSchema,
   fallbackState: z.any().optional(),
 });
 
 app.post('/api/stage', async (req, res) => {
   try {
     const parsed = StageSwitchSchema.parse(req.body);
-    const state = await loadStudentState(parsed.studentId, getAiMode(), parsed.fallbackState);
-    state.currentStageId = parsed.stageId;
-    ensureStageOpeningMessage(state, parsed.stageId);
+    const state = await loadStudentState(
+      parsed.studentId,
+      getAiMode(),
+      parsed.fallbackState
+    );
+    syncLearningPositionToStage(state, parsed.stageId);
     await saveStudentState(state);
     res.json({ state });
   } catch (err) {
@@ -87,7 +105,7 @@ app.post('/api/stage', async (req, res) => {
 
 const TutorTurnSchema = z.object({
   studentId: z.string().min(1),
-  stageId: z.enum(['stage-1', 'stage-2', 'stage-3', 'stage-4', 'stage-5', 'stage-6']),
+  stageId: StageIdSchema,
   message: z.string(),
   action: z.enum(['answer', 'ask_why', 'hint', 'challenge_start']).optional(),
   challengePrompt: z.string().optional(),
@@ -98,8 +116,11 @@ const TutorTurnSchema = z.object({
 app.post('/api/tutor/turn', async (req, res) => {
   try {
     const parsed = TutorTurnSchema.parse(req.body);
-    const state = await loadStudentState(parsed.studentId, getAiMode(), parsed.fallbackState);
-    ensureStageOpeningMessage(state, parsed.stageId);
+    const state = await loadStudentState(
+      parsed.studentId,
+      getAiMode(),
+      parsed.fallbackState
+    );
 
     const result = await runSocraticTurn(state, {
       studentId: parsed.studentId,
@@ -132,7 +153,7 @@ app.post('/api/tutor/turn', async (req, res) => {
 
 const JournalCreateSchema = z.object({
   studentId: z.string().min(1),
-  stageId: z.enum(['stage-1', 'stage-2', 'stage-3', 'stage-4', 'stage-5', 'stage-6']),
+  stageId: StageIdSchema,
   conceptId: z.string().nullable().optional(),
   entryType: z.enum(['discovery', 'explanation', 'question', 'reflection']),
   title: z.string().min(1).max(160),

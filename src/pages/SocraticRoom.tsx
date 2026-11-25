@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type {
   ConceptDefinition,
+  SequentialQuestion,
   StageDefinition,
   StageId,
   StudentState,
@@ -22,6 +23,7 @@ interface SocraticRoomProps {
   state: StudentState;
   stages: StageDefinition[];
   concepts: ConceptDefinition[];
+  questions: SequentialQuestion[];
   loading: boolean;
   error: string | null;
   onSelectStage: (stageId: StageId) => void;
@@ -36,6 +38,7 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
   state,
   stages,
   concepts,
+  questions,
   loading,
   error,
   onSelectStage,
@@ -57,6 +60,33 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
 
   const discoveredInStage = stage.conceptIds.filter(
     (cid) => state.conceptProgress[cid]?.status === 'discovered'
+  ).length;
+
+  const ls = state.learningState;
+  const activeQuestion =
+    questions.find((q) => q.id === ls.current_question) ?? questions[0];
+  const currentConceptDef = concepts.find(
+    (c) => c.id === activeQuestion?.conceptId
+  );
+  const currentConceptName =
+    state.conceptProgress[activeQuestion?.conceptId ?? '']?.status === 'discovered' ||
+    !currentConceptDef?.revealNameAfterDiscovery
+      ? currentConceptDef?.discoveredTitle
+      : currentConceptDef?.mysteryTitle;
+
+  const nextStage = stages.find((s) => s.number === stage.number + 1);
+  const upcomingConceptDef = nextStage
+    ? concepts.find((c) => c.id === nextStage.conceptIds[0])
+    : undefined;
+  const upcomingConceptName = upcomingConceptDef
+    ? state.conceptProgress[upcomingConceptDef.id]?.status === 'discovered' ||
+      !upcomingConceptDef.revealNameAfterDiscovery
+      ? upcomingConceptDef.discoveredTitle
+      : upcomingConceptDef.mysteryTitle
+    : 'Independent Mastery Complete';
+
+  const totalDiscoveredConcepts = Object.values(state.conceptProgress).filter(
+    (c) => c.status === 'discovered'
   ).length;
 
   useEffect(() => {
@@ -122,44 +152,104 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
         </button>
       </div>
 
-      {/* Stage Banner & Concept Progress */}
-      <div className="rounded-2xl border border-stone-200/80 bg-[#FDFBF7] px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-wider text-stone-500">
-            Stage {stage.number} · {stage.subtitle}
+      {/* Learning Journey Indicator (Section 7) */}
+      <div className="rounded-2xl border border-stone-200/80 bg-[#FDFBF7] px-5 py-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-500">
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">
+                {ls.topic}
+              </span>
+              <span>
+                Stage {stage.number} of {stages.length} · {stage.subtitle}
+              </span>
+            </div>
+            <h1 className="mt-1 font-display text-xl font-bold text-stone-900">
+              {stage.title}
+            </h1>
           </div>
-          <h1 className="font-display text-xl font-bold text-stone-900">
-            {stage.title}
-          </h1>
+
+          <div className="flex flex-wrap gap-1.5">
+            {stage.conceptIds.map((cid) => {
+              const def = concepts.find((c) => c.id === cid);
+              const prog = state.conceptProgress[cid];
+              const status = prog?.status ?? 'undiscovered';
+              const label =
+                status === 'discovered' || !def?.revealNameAfterDiscovery
+                  ? def?.discoveredTitle
+                  : def?.mysteryTitle;
+              return (
+                <span
+                  key={cid}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border ${
+                    status === 'discovered'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : status === 'exploring'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-white text-stone-400 border-stone-200'
+                  }`}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {status === 'undiscovered' && def?.revealNameAfterDiscovery
+                    ? 'Hidden Pattern ?'
+                    : label}
+                </span>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {stage.conceptIds.map((cid) => {
-            const def = concepts.find((c) => c.id === cid);
-            const prog = state.conceptProgress[cid];
-            const status = prog?.status ?? 'undiscovered';
-            const label =
-              status === 'discovered' || !def?.revealNameAfterDiscovery
-                ? def?.discoveredTitle
-                : def?.mysteryTitle;
-            return (
-              <span
-                key={cid}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border ${
-                  status === 'discovered'
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : status === 'exploring'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-white text-stone-400 border-stone-200'
-                }`}
-              >
-                <Sparkles className="h-3 w-3" />
-                {status === 'undiscovered' && def?.revealNameAfterDiscovery
-                  ? 'Hidden Pattern ?'
-                  : label}
-              </span>
-            );
-          })}
+        {/* Sequential Progress Strip */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 pt-2.5 border-t border-stone-200/70 text-xs">
+          <div className="rounded-xl bg-white px-3 py-2 border border-stone-200/70">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              Current Concept
+            </div>
+            <div className="mt-0.5 font-semibold text-stone-900 truncate">
+              {currentConceptName || stage.title}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white px-3 py-2 border border-stone-200/70">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              Active Step
+            </div>
+            <div className="mt-0.5 font-math font-semibold text-stone-900">
+              Question {ls.current_question} of {questions.length || 34}
+              {ls.pending_followup && (
+                <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-sans text-amber-900">
+                  Follow-up
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white px-3 py-2 border border-stone-200/70">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              Questions Completed
+            </div>
+            <div className="mt-0.5 font-math font-semibold text-emerald-700">
+              {ls.completed_questions.length} / {questions.length || 34}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white px-3 py-2 border border-stone-200/70">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              Upcoming Concept
+            </div>
+            <div className="mt-0.5 font-medium text-stone-700 truncate">
+              {upcomingConceptName}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white px-3 py-2 border border-stone-200/70 col-span-2 lg:col-span-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              Concepts Discovered
+            </div>
+            <div className="mt-0.5 font-math font-semibold text-indigo-700">
+              {totalDiscoveredConcepts} / {concepts.length}
+            </div>
+          </div>
         </div>
       </div>
 
