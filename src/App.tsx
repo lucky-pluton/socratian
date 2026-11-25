@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   addJournalEntry,
@@ -47,6 +47,7 @@ export const App: React.FC = () => {
   const [tutorError, setTutorError] = useState<string | null>(null);
   const [celebratedConcepts, setCelebratedConcepts] = useState<ConceptDefinition[]>([]);
   const [celebratedBadges, setCelebratedBadges] = useState<BadgeDefinition[]>([]);
+  const turnInFlightRef = useRef(false);
 
   const loadAll = useCallback(async () => {
     try {
@@ -106,10 +107,12 @@ export const App: React.FC = () => {
   const handleSendTurn = async (
     message: string,
     action: 'answer' | 'ask_why' | 'hint' | 'simplify' = 'answer'
-  ) => {
-    if (!state) return;
+  ): Promise<boolean> => {
+    if (!state || turnInFlightRef.current) return false;
+    turnInFlightRef.current = true;
     setTutorLoading(true);
     setTutorError(null);
+    const clientTurnId = `turn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
       const res = await sendTutorTurn({
         studentId,
@@ -117,19 +120,25 @@ export const App: React.FC = () => {
         message,
         action,
         challengeKind: activeChallengeKind,
+        clientTurnId,
       });
       setState(res.state);
       if (res.newlyDiscoveredConcepts.length > 0 || res.newlyEarnedBadges.length > 0) {
         setCelebratedConcepts(res.newlyDiscoveredConcepts);
         setCelebratedBadges(res.newlyEarnedBadges);
       }
-      // Refresh challenge status if completed
-      const st = await fetchState(studentId);
-      setDailyChallenge(st.dailyChallenge);
-      setWeeklyChallenge(st.weeklyChallenge);
+      if (activeChallengeKind === 'daily' && res.state.dailyChallengeCompletedDate) {
+        setDailyChallenge((d) => (d ? { ...d, completed: true } : d));
+      }
+      if (activeChallengeKind === 'weekly' && res.state.weeklyChallengeCompleted) {
+        setWeeklyChallenge((w) => (w ? { ...w, completed: true } : w));
+      }
+      return true;
     } catch (err) {
       setTutorError(err instanceof Error ? err.message : 'Tutor request failed');
+      return false;
     } finally {
+      turnInFlightRef.current = false;
       setTutorLoading(false);
     }
   };

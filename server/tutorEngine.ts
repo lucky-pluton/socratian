@@ -307,12 +307,17 @@ function detectUnrelatedDoubt(text: string, q: SequentialQuestion): string | nul
   if (!lower.includes('?') && !/^(what is|why is|how do|can you tell me|who |wait, )/.test(lower)) {
     return null;
   }
-  // Check if the question is actually about the current prompt topic
+  const hasAnswerNumber = extractNumbers(lower).length > 0;
   const onTopic =
+    hasAnswerNumber ||
     q.reasoningKeywords.some((kw) => lower.includes(kw)) ||
-    lower.includes('why does this') ||
-    lower.includes('why does it');
-  if (onTopic && !/(fraction|multiply|multiplication|divide|division|planet|pi|gravity|algebra|triangle|square root|prime|percentage)/.test(lower)) {
+    /\b(answer|chocolate|apple|book|balloon|debt|owe|zero|line|step|group|order|minus|negative|positive|same|total|why does|how did)\b/.test(
+      lower
+    );
+  const explicitOtherMath = /(fraction|decimal|multiply|multiplication|divide|division|planet|pi|gravity|algebra|triangle|square root|prime|percentage)/.test(
+    lower
+  );
+  if (onTopic && !explicitOtherMath) {
     return null;
   }
   if (/(multiply|multiplication|times)/.test(lower)) {
@@ -330,12 +335,7 @@ function detectUnrelatedDoubt(text: string, q: SequentialQuestion): string | nul
   if (/(prime)/.test(lower)) {
     return 'Quick answer: a prime number has only two whole-number divisors: 1 and itself.';
   }
-  // Any clearly off-topic question mark
-  if (
-    lower.endsWith('?') &&
-    !onTopic &&
-    text.trim().split(/\s+/).length >= 3
-  ) {
+  if (lower.endsWith('?') && !onTopic && text.trim().split(/\s+/).length >= 3) {
     return "That's a fun curiosity! Let's keep it brief so we don't lose our thread — we can explore that more once we wrap up this Addition idea.";
   }
   return null;
@@ -366,6 +366,11 @@ function hasValidReasoningForQuestion(
   const bare = isBareShortReply(text);
   const enoughExplanation =
     !bare && (matched >= 1 || hasConnector || altMatched || wordCount >= 6);
+
+  // On open-ended explanation questions (no fixed number/boolean required), accept concise genuine reasoning like "I counted" or "2 + 2"
+  if (!q.acceptedNumbers && !q.acceptedBoolean && (matched >= 1 || hasConnector || altMatched) && wordCount >= 2) {
+    return { hasReasoning: true, matchedKeywords: matched, alternativeValid: altMatched };
+  }
 
   // If they previously gave the right value and now explain why, lower threshold cleanly
   if (previousStudentAnswerInFollowup && !bare && wordCount >= 3 && (matched >= 1 || hasConnector || altMatched)) {
@@ -715,6 +720,24 @@ export async function runSocraticTurn(
   newlyEarnedBadges: BadgeDefinition[];
 }> {
   const now = new Date().toISOString();
+
+  // Idempotency guard: prevent duplicate tutor responses for retried/double-submitted clientTurnId
+  if (req.clientTurnId && state.learningState.last_turn_id === req.clientTurnId) {
+    const existingTutor = [...state.messages]
+      .reverse()
+      .find((m) => m.role === 'tutor');
+    if (existingTutor) {
+      return {
+        tutorMessage: existingTutor,
+        newlyDiscoveredConcepts: [],
+        newlyEarnedBadges: [],
+      };
+    }
+  }
+  if (req.clientTurnId) {
+    state.learningState.last_turn_id = req.clientTurnId;
+  }
+
   const q = getQuestionById(state.learningState.current_question);
   const stage = getStageById(q.stageId);
   const isFinalQuestionOfStage =
@@ -786,7 +809,7 @@ export async function runSocraticTurn(
       stageId: q.stageId,
       questionId: q.id,
       role: 'tutor',
-      content: `${q.adaptiveHint} With that in mind, how would you answer: ${q.prompt}`,
+      content: `${q.adaptiveHint} Try the picture below and share what you notice.`,
       assessment: {
         whatUnderstood: 'Requested a gentle scaffold',
         whatMisunderstood: null,
@@ -1094,6 +1117,17 @@ export async function runSocraticTurn(
   state.patternsDiscovered = ['commutative_property', 'associative_property', 'additive_inverse'].filter(
     (cid) => state.conceptProgress[cid]?.status === 'discovered'
   ).length;
+
+  // Anti-duplicate guard: never emit the exact same tutor sentence twice in a row on the same step
+  const prevStageTutor = [...state.messages]
+    .reverse()
+    .find((m) => m.stageId === targetStageIdForMsg && m.role === 'tutor');
+  if (
+    prevStageTutor &&
+    prevStageTutor.content.trim().toLowerCase() === responseText.trim().toLowerCase()
+  ) {
+    responseText = `Let's take an even smaller look at this: ${q.adaptiveHint} What do you spot in the picture below?`;
+  }
 
   const tutorMessage: ConversationMessage = {
     id: `msg-tut-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

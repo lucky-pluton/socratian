@@ -153,6 +153,7 @@ export interface TopicLearningProgress {
   | null;
   struggle_count: number;
   next_question: number;
+  last_turn_id?: string | null;
   stage_summaries: Record<string, string>;
 }
 
@@ -229,6 +230,7 @@ export interface TutorTurnRequest {
   message: string;
   action?: 'answer' | 'ask_why' | 'hint' | 'simplify' | 'challenge_start';
   challengePrompt?: string;
+  clientTurnId?: string;
 }
 
 export interface TutorTurnResponse {

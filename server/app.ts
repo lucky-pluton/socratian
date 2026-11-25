@@ -110,6 +110,7 @@ const TutorTurnSchema = z.object({
   action: z.enum(['answer', 'ask_why', 'hint', 'simplify', 'challenge_start']).optional(),
   challengePrompt: z.string().optional(),
   challengeKind: z.enum(['daily', 'weekly']).optional(),
+  clientTurnId: z.string().optional(),
   fallbackState: z.any().optional(),
 });
 
@@ -128,6 +129,7 @@ app.post('/api/tutor/turn', async (req, res) => {
       message: parsed.message,
       action: parsed.action,
       challengePrompt: parsed.challengePrompt,
+      clientTurnId: parsed.clientTurnId,
     });
 
     if (parsed.challengeKind === 'daily' && result.tutorMessage.assessment?.reasoningCorrect) {

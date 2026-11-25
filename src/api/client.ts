@@ -72,15 +72,23 @@ export function fetchCurriculum(): Promise<CurriculumPayload> {
 export async function fetchState(studentId: string): Promise<StatePayload> {
   const res = await jsonFetch<StatePayload>(`/api/state?studentId=${encodeURIComponent(studentId)}`);
   const cached = getCachedState();
-  if (
+  const serverLooksFresh =
+    res.state.persistenceMode === 'local' &&
+    res.state.learningState.completed_questions.length === 0 &&
+    !res.state.learningState.pending_followup &&
+    res.state.messages.length <= 2;
+
+  const cacheHasProgress =
     cached &&
     cached.studentId === studentId &&
     cached.learningState &&
     Array.isArray(cached.learningState.completed_questions) &&
-    res.state.persistenceMode === 'local' &&
-    res.state.messages.length <= 1 &&
-    cached.messages.length > 1
-  ) {
+    (cached.learningState.completed_questions.length > 0 ||
+      cached.learningState.pending_followup ||
+      cached.messages.length > 2 ||
+      cached.currentStageId !== 'stage-1');
+
+  if (serverLooksFresh && cacheHasProgress) {
     return { ...res, state: cached };
   }
   cacheState(res.state);

@@ -329,3 +329,60 @@ test('Inline Visual Learning: beginner who does not know addition gets interacti
   const newMsgs = state.messages.slice(prevLen);
   assert.ok(newMsgs.some((m) => m.role === 'visual'), 'Every tutor turn includes an inline visual');
 });
+
+test('Idempotency & Anti-Repetition: duplicate clientTurnId creates only one response; concise answers & ? replies progress cleanly', async () => {
+  const state = makeFreshState('idempotency-test');
+
+  // 1. On-topic reply ending with "?" is not misclassified as unrelated doubt
+  const r1 = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'Is it 4?',
+    action: 'answer',
+    clientTurnId: 'turn-abc-1',
+  });
+  assert.equal(state.learningState.current_question, 2);
+  const msgCountAfterFirst = state.messages.length;
+
+  // 2. Submitting same clientTurnId again does NOT duplicate messages or advance again
+  const r1Dup = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'Is it 4?',
+    action: 'answer',
+    clientTurnId: 'turn-abc-1',
+  });
+  assert.equal(r1Dup.tutorMessage.id, r1.tutorMessage.id);
+  assert.equal(state.messages.length, msgCountAfterFirst);
+  assert.equal(state.learningState.current_question, 2);
+
+  // 3. Concise 2-word explanation on Q2 ("I counted") advances cleanly to Q3
+  await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'I counted',
+    action: 'answer',
+    clientTurnId: 'turn-abc-2',
+  });
+  assert.equal(state.learningState.current_question, 3);
+
+  // 4. Anti-duplicate guard varies consecutive identical follow-ups
+  const w1 = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'idk',
+    action: 'answer',
+    clientTurnId: 'turn-abc-3',
+  });
+  const w2 = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'idk',
+    action: 'answer',
+    clientTurnId: 'turn-abc-4',
+  });
+  assert.notEqual(
+    w1.tutorMessage.content.trim().toLowerCase(),
+    w2.tutorMessage.content.trim().toLowerCase()
+  );
+});

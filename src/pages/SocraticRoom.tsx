@@ -21,9 +21,17 @@ interface SocraticRoomProps {
   onSendTurn: (
     message: string,
     action?: 'answer' | 'ask_why' | 'hint' | 'simplify'
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   onPauseToHome: () => void;
   onSaveToJournal: (title: string, content: string) => Promise<void>;
+}
+
+function isTouchDevice(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  );
 }
 
 export const SocraticRoom: React.FC<SocraticRoomProps> = ({
@@ -38,6 +46,9 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
   const [input, setInput] = useState('');
   const [showPinnedVisual, setShowPinnedVisual] = useState<boolean>(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const wasLoadingRef = useRef<boolean>(loading);
 
   const stage = stages.find((s) => s.id === state.currentStageId) ?? stages[0];
   const stageMessages = state.messages.filter((m) => m.stageId === stage.id);
@@ -57,12 +68,53 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [stageMessages.length, loading]);
 
+  // Initial desktop focus when entering the room or switching stages
+  useEffect(() => {
+    if (loading || isTouchDevice()) return;
+    const rafId = window.requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el || document.activeElement === el) return;
+      el.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(rafId);
+    // Run only on mount / stage switch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage.id]);
+
+  // Restore focus to chat input after tutor finishes responding (desktop only)
+  useEffect(() => {
+    const justFinishedLoading = wasLoadingRef.current && !loading;
+    wasLoadingRef.current = loading;
+
+    if (!justFinishedLoading || isTouchDevice()) return;
+
+    const rafId = window.requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      const active = document.activeElement;
+      // If user is already typing in input, preserve cursor position untouched
+      if (active === el) return;
+      // Do not steal focus if user moved focus to an unrelated control outside the chat form
+      const safeToFocus =
+        !active ||
+        active === document.body ||
+        Boolean(formRef.current?.contains(active));
+      if (safeToFocus) {
+        el.focus({ preventScroll: true });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [loading]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || loading) return;
-    setInput('');
-    await onSendTurn(trimmed, 'answer');
+    const ok = await onSendTurn(trimmed, 'answer');
+    if (ok) {
+      setInput('');
+    }
   };
 
   return (
@@ -163,13 +215,14 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
 
         {/* Docked Simple Response Bar */}
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="shrink-0 border-t border-stone-100 p-3.5 sm:p-4 bg-[#FDFBF8] flex items-center gap-2.5"
         >
           <button
             type="button"
             disabled={loading}
-            onClick={() => onSendTurn('Hint please', 'hint')}
+            onClick={() => void onSendTurn('Hint please', 'hint')}
             title="Show a helpful visual clue"
             className="inline-flex h-11 px-3.5 items-center gap-1.5 rounded-2xl border border-stone-200 bg-white text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40 transition cursor-pointer shrink-0"
           >
@@ -178,6 +231,7 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
           </button>
 
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
