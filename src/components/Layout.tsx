@@ -34,7 +34,11 @@ export const Layout: React.FC<LayoutProps> = ({
   children,
 }) => {
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#1E2430]">
+    <div
+      className={`flex flex-col bg-[#FAF7F2] text-[#1E2430] ${
+        activeTab === 'room' ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+      }`}
+    >
       {/* Minimal Top Navigation */}
       <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#FAF7F2]/95 backdrop-blur">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -86,31 +90,39 @@ export const Layout: React.FC<LayoutProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
-        <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
+      <main className={activeTab === 'room' ? 'flex-1 flex flex-col min-h-0' : 'flex-1'}>
+        <div
+          className={
+            activeTab === 'room'
+              ? 'mx-auto w-full max-w-6xl flex-1 flex flex-col min-h-0 px-3 py-3 sm:px-6 sm:py-4'
+              : 'mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10'
+          }
+        >
           {children}
         </div>
       </main>
 
-      {/* Quiet Footer */}
-      <footer className="py-4 text-center text-[11px] text-stone-400">
-        {state.aiMode === 'gemini' ? 'Gemini AI Tutor' : 'Demo Mode'} ·{' '}
-        <button
-          type="button"
-          onClick={() => onSelectTab('progress')}
-          className="underline hover:text-stone-600 cursor-pointer"
-        >
-          Milestones
-        </button>{' '}
-        ·{' '}
-        <button
-          type="button"
-          onClick={onReset}
-          className="underline hover:text-stone-600 cursor-pointer"
-        >
-          Reset
-        </button>
-      </footer>
+      {/* Quiet Footer (hidden on full-screen Learn tab) */}
+      {activeTab !== 'room' && (
+        <footer className="py-4 text-center text-[11px] text-stone-400">
+          {state.aiMode === 'gemini' ? 'Gemini AI Tutor' : 'Demo Mode'} ·{' '}
+          <button
+            type="button"
+            onClick={() => onSelectTab('progress')}
+            className="underline hover:text-stone-600 cursor-pointer"
+          >
+            Milestones
+          </button>{' '}
+          ·{' '}
+          <button
+            type="button"
+            onClick={onReset}
+            className="underline hover:text-stone-600 cursor-pointer"
+          >
+            Reset
+          </button>
+        </footer>
+      )}
     </div>
   );
 };

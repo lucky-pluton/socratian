@@ -66,9 +66,9 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="w-full flex-1 flex flex-col min-h-0 gap-3">
       {/* Subtle Single-Line Progress Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-stone-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-stone-500 shrink-0">
         <div className="flex items-center gap-2">
           <select
             aria-label="Choose stage"
@@ -103,16 +103,18 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
 
       {/* Optional Pinned Visual Board */}
       {showPinnedVisual && (
-        <StageVisualDock stageId={stage.id} visualHint={activeVisualHint} />
+        <div className="shrink-0">
+          <StageVisualDock stageId={stage.id} visualHint={activeVisualHint} />
+        </div>
       )}
 
-      {/* Calm Conversation Stream (Tutor + Inline Visuals + Student) */}
-      <div className="rounded-3xl border border-stone-200/80 bg-white shadow-xs flex flex-col min-h-[500px] max-h-[680px]">
-        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-7 space-y-4">
+      {/* Full-Screen Conversation & Prominent Inline Visuals */}
+      <div className="flex-1 min-h-0 rounded-3xl border border-stone-200/80 bg-white shadow-xs flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-6 space-y-5">
           {stageMessages.map((msg) => {
             if (msg.role === 'visual' && msg.visualHint) {
               return (
-                <div key={msg.id} className="w-full max-w-xl">
+                <div key={msg.id} className="w-full max-w-3xl">
                   <StageVisualDock
                     stageId={msg.stageId}
                     visualHint={msg.visualHint}
@@ -129,12 +131,12 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
                 className={`flex ${isTutor ? 'justify-start' : 'justify-end'}`}
               >
                 <div
-                  className={`max-w-[88%] rounded-2xl px-4 py-3 leading-relaxed ${
+                  className={`max-w-[85%] sm:max-w-2xl rounded-2xl px-4 py-3 leading-relaxed ${
                     isTutor
                       ? isLatestTutor
-                        ? 'bg-[#FFFBF3] border border-amber-200/70 text-stone-900 font-display text-base sm:text-lg'
-                        : 'bg-[#F8F5EE] text-stone-700 text-sm'
-                      : 'bg-stone-900 text-white text-sm'
+                        ? 'bg-[#FFFBF3] border border-amber-200/70 text-stone-900 font-display text-base sm:text-xl'
+                        : 'bg-[#F8F5EE] text-stone-700 text-sm sm:text-base'
+                      : 'bg-stone-900 text-white text-sm sm:text-base'
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -159,17 +161,17 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
           <div ref={bottomRef} />
         </div>
 
-        {/* One Simple Response Box + Send + Optional Hint */}
+        {/* Docked Simple Response Bar */}
         <form
           onSubmit={handleSubmit}
-          className="border-t border-stone-100 p-3.5 sm:p-4 bg-[#FDFBF8] rounded-b-3xl flex items-center gap-2"
+          className="shrink-0 border-t border-stone-100 p-3.5 sm:p-4 bg-[#FDFBF8] flex items-center gap-2.5"
         >
           <button
             type="button"
             disabled={loading}
             onClick={() => onSendTurn('Hint please', 'hint')}
             title="Show a helpful visual clue"
-            className="inline-flex h-11 px-3 items-center gap-1 rounded-2xl border border-stone-200 bg-white text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40 transition cursor-pointer shrink-0"
+            className="inline-flex h-11 px-3.5 items-center gap-1.5 rounded-2xl border border-stone-200 bg-white text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40 transition cursor-pointer shrink-0"
           >
             <Lightbulb className="h-3.5 w-3.5 text-amber-600" />
             <span className="hidden sm:inline">Hint</span>
@@ -188,7 +190,7 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
             type="submit"
             disabled={loading || !input.trim()}
             aria-label="Send"
-            className="inline-flex h-11 px-4 items-center justify-center gap-1.5 rounded-2xl bg-stone-900 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-40 transition cursor-pointer shrink-0"
+            className="inline-flex h-11 px-5 items-center justify-center gap-1.5 rounded-2xl bg-stone-900 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-40 transition cursor-pointer shrink-0"
           >
             <Send className="h-4 w-4" />
             <span>Send</span>
