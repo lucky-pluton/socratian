@@ -227,11 +227,19 @@ async function callGeminiEvaluator(
 ): Promise<EvaluatorOutput> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error('GEMINI_API_KEY missing');
-  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+  const candidateModels = Array.from(
+    new Set([
+      primaryModel,
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
+    ])
+  );
   const client = new GoogleGenAI({ apiKey });
 
   const recentDialogue = state.messages
-    .filter((m) => m.stageId === q.stageId)
+    .filter((m) => m.stageId === q.stageId && m.role !== 'visual')
     .slice(-10)
     .map((m) => `${m.role === 'tutor' ? 'Tutor' : 'Student'}: ${m.content}`)
     .join('\n');
@@ -243,21 +251,33 @@ Latest student message: "${req.message}"
 
 Evaluate the student's response strictly against Question #${q.id} ("${q.prompt}") and return JSON.`;
 
-  const interaction = await client.interactions.create({
-    model,
-    system_instruction: buildEvaluatorSystemPrompt(state, q, isFinalQuestionOfStage),
-    input,
-    store: false,
-    response_format: {
-      type: 'text',
-      mime_type: 'application/json',
-      schema: EVALUATOR_JSON_SCHEMA,
-    },
-  });
+  const systemInstruction = buildEvaluatorSystemPrompt(state, q, isFinalQuestionOfStage);
+  let lastError: unknown;
 
-  const rawText = interaction.output_text;
-  if (!rawText) throw new Error('Empty response from Gemini Interactions API');
-  return EvaluatorOutputSchema.parse(JSON.parse(rawText));
+  for (const model of candidateModels) {
+    try {
+      const interaction = await client.interactions.create({
+        model,
+        system_instruction: systemInstruction,
+        input,
+        store: false,
+        response_format: {
+          type: 'text',
+          mime_type: 'application/json',
+          schema: EVALUATOR_JSON_SCHEMA,
+        },
+      });
+
+      const rawText = interaction.output_text;
+      if (!rawText) throw new Error(`Empty response from ${model}`);
+      return EvaluatorOutputSchema.parse(JSON.parse(rawText));
+    } catch (err) {
+      lastError = err;
+      console.warn(`Gemini model ${model} failed, trying fallback if available:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('All Gemini models failed');
 }
 
 // ============================================================================
