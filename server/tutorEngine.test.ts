@@ -366,7 +366,7 @@ test('Idempotency & Anti-Repetition: duplicate clientTurnId creates only one res
   });
   assert.equal(state.learningState.current_question, 3);
 
-  // 4. Anti-duplicate guard varies consecutive identical follow-ups
+  // 4. Anti-duplicate guard varies consecutive identical follow-ups across ALL prior messages on this question
   const w1 = await runSocraticTurn(state, {
     studentId: 'idempotency-test',
     stageId: 'stage-1',
@@ -381,8 +381,40 @@ test('Idempotency & Anti-Repetition: duplicate clientTurnId creates only one res
     action: 'answer',
     clientTurnId: 'turn-abc-4',
   });
-  assert.notEqual(
-    w1.tutorMessage.content.trim().toLowerCase(),
-    w2.tutorMessage.content.trim().toLowerCase()
+  const w3 = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'idk',
+    action: 'answer',
+    clientTurnId: 'turn-abc-5',
+  });
+  assert.equal(
+    new Set([
+      w1.tutorMessage.content.trim().toLowerCase(),
+      w2.tutorMessage.content.trim().toLowerCase(),
+      w3.tutorMessage.content.trim().toLowerCase(),
+    ]).size,
+    3,
+    'Should never ping-pong or repeat the same follow-up text'
   );
+
+  // 5. Answering Q3 stepping-stone ("what is the very next number after 18?") with "19" progresses cleanly without looping
+  const step19 = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: '19',
+    action: 'answer',
+    clientTurnId: 'turn-abc-6',
+  });
+  assert.match(step19.tutorMessage.content, /Yes, 19!.*count the first 18 again\?/i);
+
+  const stepNo = await runSocraticTurn(state, {
+    studentId: 'idempotency-test',
+    stageId: 'stage-1',
+    message: 'no because 18 is already counted',
+    action: 'answer',
+    clientTurnId: 'turn-abc-7',
+  });
+  assert.equal(state.learningState.current_question, 4);
+  assert.match(stepNo.tutorMessage.content, /counting forward helps/i);
 });

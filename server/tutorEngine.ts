@@ -396,6 +396,30 @@ function studentGavePreviousCorrectValue(state: StudentState, q: SequentialQuest
   return false;
 }
 
+function getLastTutorContentForStage(state: StudentState, stageId: StageId): string {
+  const m = [...state.messages]
+    .reverse()
+    .find((msg) => msg.stageId === stageId && msg.role === 'tutor');
+  return m?.content ?? '';
+}
+
+function getPriorTutorContentsForQuestion(
+  state: StudentState,
+  stageId: StageId,
+  questionId: number
+): Set<string> {
+  return new Set(
+    state.messages
+      .filter(
+        (msg) =>
+          msg.stageId === stageId &&
+          msg.role === 'tutor' &&
+          msg.questionId === questionId
+      )
+      .map((msg) => msg.content.trim().toLowerCase())
+  );
+}
+
 export function evaluateDemoResponse(
   state: StudentState,
   q: SequentialQuestion,
@@ -406,6 +430,51 @@ export function evaluateDemoResponse(
   const nums = extractNumbers(text);
   const yesNo = detectYesNo(text);
   const prevGaveValue = studentGavePreviousCorrectValue(state, q);
+  const lastTutorLower = getLastTutorContentForStage(state, q.stageId).toLowerCase();
+
+  // 0. Handle stepping-stone follow-up answers directly so they never loop
+  if (q.id === 3 && lastTutorLower.includes('next number after 18') && nums.includes(19)) {
+    if (yesNo === 'no' || nums.includes(23) || lower.includes('count') || lower.includes('no')) {
+      return {
+        evaluation: 'understood',
+        alternativeValidExplanation: true,
+        whatUnderstood: 'Counted forward starting at 19 instead of recounting from 1',
+        whatMisunderstood: null,
+        detectedMisconception: null,
+        strategyUsed: 'concept_synthesis',
+        bridgeAcknowledgement: 'Yes — 19! You skipped recounting all 18.',
+        adaptiveFollowUpQuestion: '',
+        studentInsightSummary: 'Starting at 19 lets you count forward without recounting 18.',
+      };
+    }
+    return {
+      evaluation: 'partial',
+      alternativeValidExplanation: false,
+      whatUnderstood: 'Correctly identified 19 as the next number after 18',
+      whatMisunderstood: 'Needs to connect 19 back to skipping the recount of 18',
+      detectedMisconception: null,
+      strategyUsed: 'socratic_probe',
+      bridgeAcknowledgement: '',
+      adaptiveFollowUpQuestion:
+        'Yes, 19! So if you start right at 19, do you still need to count the first 18 again?',
+      studentInsightSummary: null,
+    };
+  }
+
+  if (q.id === 32 && lastTutorLower.includes('noon') && nums.includes(5) && !nums.includes(-2)) {
+    return {
+      evaluation: 'partial',
+      alternativeValidExplanation: false,
+      whatUnderstood: 'Found +5°C at noon',
+      whatMisunderstood: 'Still needs the midnight 7°C drop from +5°C',
+      detectedMisconception: null,
+      strategyUsed: 'socratic_probe',
+      bridgeAcknowledgement: '',
+      adaptiveFollowUpQuestion:
+        'Nice — it reaches +5°C at noon! Now if it drops 7°C from +5°C, where does it end up?',
+      studentInsightSummary: null,
+    };
+  }
 
   // 1. Check unrelated doubt (Scenario E)
   const unrelatedReply = detectUnrelatedDoubt(text, q);
@@ -1118,15 +1187,24 @@ export async function runSocraticTurn(
     (cid) => state.conceptProgress[cid]?.status === 'discovered'
   ).length;
 
-  // Anti-duplicate guard: never emit the exact same tutor sentence twice in a row on the same step
-  const prevStageTutor = [...state.messages]
-    .reverse()
-    .find((m) => m.stageId === targetStageIdForMsg && m.role === 'tutor');
-  if (
-    prevStageTutor &&
-    prevStageTutor.content.trim().toLowerCase() === responseText.trim().toLowerCase()
-  ) {
-    responseText = `Let's take an even smaller look at this: ${q.adaptiveHint} What do you spot in the picture below?`;
+  // Anti-duplicate guard: check ALL prior tutor messages for this question so we never ping-pong or repeat
+  const priorContents = getPriorTutorContentsForQuestion(
+    state,
+    targetStageIdForMsg,
+    targetQuestionIdForMsg
+  );
+  if (priorContents.has(responseText.trim().toLowerCase())) {
+    const altFallbacks = [
+      `Let's try a super simple check: ${q.adaptiveHint}`,
+      `Look at the picture below for a moment — what changes if we take just one small step?`,
+      `No rush! Try telling me in one short sentence what you see happening here.`,
+    ];
+    const fresh = altFallbacks.find(
+      (candidate) => !priorContents.has(candidate.trim().toLowerCase())
+    );
+    responseText =
+      fresh ??
+      `You're doing fine — tell me what you notice in the picture below, and we'll take the next step together.`;
   }
 
   const tutorMessage: ConversationMessage = {
