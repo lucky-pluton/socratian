@@ -4,7 +4,7 @@ import { InteractiveNumberLine } from '../components/visuals/InteractiveNumberLi
 type LabMode = 'number_line' | 'chocolates' | 'bank' | 'patterns';
 
 export const PracticeLab: React.FC = () => {
-  const [lab, setLab] = useState<LabMode>('number_line');
+  const [lab, setLab] = useState<LabMode>('bank');
   const [nlStart, setNlStart] = useState(-5);
   const [nlAddend, setNlAddend] = useState(7);
 
@@ -29,9 +29,9 @@ export const PracticeLab: React.FC = () => {
 
         <div className="flex flex-wrap gap-1.5">
           {[
+            { id: 'bank' as const, label: 'Debt' },
             { id: 'number_line' as const, label: 'Number Line' },
             { id: 'chocolates' as const, label: 'Counting' },
-            { id: 'bank' as const, label: 'Debt' },
             { id: 'patterns' as const, label: 'Grouping' },
           ].map((item) => (
             <button
