@@ -35,7 +35,7 @@ create table if not exists conversation_messages (
   student_id text not null references student_profiles(id) on delete cascade,
   stage_id text not null,
   question_id int,
-  role text not null check (role in ('tutor', 'student')),
+  role text not null check (role in ('tutor', 'visual', 'student')),
   content text not null,
   assessment jsonb,
   visual_hint jsonb,

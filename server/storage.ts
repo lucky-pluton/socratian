@@ -97,6 +97,15 @@ export function createDefaultStudent(
         visualHint: firstQuestion.visualHint,
         createdAt: now,
       },
+      {
+        id: `msg-vis-${firstStage.id}-q${firstQuestion.id}`,
+        stageId: firstStage.id,
+        questionId: firstQuestion.id,
+        role: 'visual',
+        content: '',
+        visualHint: firstQuestion.visualHint,
+        createdAt: now,
+      },
     ],
     journal: [
       {
@@ -260,7 +269,7 @@ export async function loadStudentState(
           id: m.id,
           stageId: m.stage_id as StageId,
           questionId: m.question_id ?? undefined,
-          role: m.role as 'tutor' | 'student',
+          role: m.role as 'tutor' | 'visual' | 'student',
           content: m.content,
           assessment: m.assessment ?? undefined,
           visualHint: m.visual_hint ?? undefined,
@@ -449,6 +458,7 @@ export function syncLearningPositionToStage(
   if (hasStageMsgs) return null;
 
   const q = getQuestionById(targetQId);
+  const now = new Date().toISOString();
   const msg: ConversationMessage = {
     id: `msg-init-${stage.id}-q${q.id}-${Date.now()}`,
     stageId: stage.id,
@@ -456,8 +466,19 @@ export function syncLearningPositionToStage(
     role: 'tutor',
     content: q.prompt,
     visualHint: q.visualHint,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   };
   state.messages.push(msg);
+  if (q.showVisualOnAsk !== false) {
+    state.messages.push({
+      id: `msg-vis-${stage.id}-q${q.id}-${Date.now()}`,
+      stageId: stage.id,
+      questionId: q.id,
+      role: 'visual',
+      content: '',
+      visualHint: q.visualHint,
+      createdAt: now,
+    });
+  }
   return msg;
 }

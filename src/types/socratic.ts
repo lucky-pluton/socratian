@@ -22,14 +22,31 @@ export type TeachingStrategy =
 
 export type VisualHintType =
   | 'chocolates'
+  | 'combine_objects'
+  | 'take_away_objects'
   | 'context_blocks'
   | 'bank_ledger'
   | 'number_line'
   | 'property_tiles'
+  | 'commutative_swap'
+  | 'associative_regroup'
   | 'elevation_temp';
+
+export type VisualObjectKind =
+  | 'chocolate'
+  | 'apple'
+  | 'book'
+  | 'balloon'
+  | 'coin'
+  | 'dot';
 
 export interface VisualHint {
   type: VisualHintType;
+  objectKind?: VisualObjectKind;
+  operation?: 'add' | 'subtract' | 'compare' | 'swap' | 'regroup' | 'move';
+  animate?: 'merge' | 'count_on' | 'disappear' | 'swap' | 'regroup' | 'slide' | 'none';
+  interactive?: boolean;
+  showNumbers?: boolean;
   start?: number;
   addend?: number;
   groupA?: number;
@@ -59,7 +76,7 @@ export interface ConversationMessage {
   id: string;
   stageId: StageId;
   questionId?: number;
-  role: 'tutor' | 'student';
+  role: 'tutor' | 'visual' | 'student';
   content: string;
   assessment?: TutorAssessment;
   visualHint?: VisualHint;
@@ -100,6 +117,7 @@ export interface SequentialQuestion {
   reasoningKeywords: string[];
   misconceptions: MisconceptionRule[];
   adaptiveHint: string;
+  showVisualOnAsk?: boolean;
   visualHint: VisualHint;
 }
 

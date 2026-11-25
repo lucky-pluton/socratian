@@ -36,23 +36,19 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
   onSendTurn,
 }) => {
   const [input, setInput] = useState('');
-  const [showVisual, setShowVisual] = useState<boolean>(
-    state.currentStageId === 'stage-8'
-  );
+  const [showPinnedVisual, setShowPinnedVisual] = useState<boolean>(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const stage = stages.find((s) => s.id === state.currentStageId) ?? stages[0];
   const stageMessages = state.messages.filter((m) => m.stageId === stage.id);
 
-  useEffect(() => {
-    if (stage.id === 'stage-8') {
-      setShowVisual(true);
-    }
-  }, [stage.id]);
-
   const activeVisualHint: VisualHint | undefined =
     [...stageMessages].reverse().find((m) => m.visualHint)?.visualHint ??
     stage.openingVisualHint;
+
+  const latestTutorId = [...stageMessages]
+    .reverse()
+    .find((m) => m.role === 'tutor')?.id;
 
   const ls = state.learningState;
   const totalQuestions = questions.length || 34;
@@ -93,25 +89,40 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
 
         <button
           type="button"
-          onClick={() => setShowVisual((v) => !v)}
+          onClick={() => setShowPinnedVisual((v) => !v)}
           className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition cursor-pointer"
         >
-          {showVisual ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          {showVisual ? 'Hide visual' : 'Visual'}
+          {showPinnedVisual ? (
+            <EyeOff className="h-3.5 w-3.5" />
+          ) : (
+            <Eye className="h-3.5 w-3.5" />
+          )}
+          {showPinnedVisual ? 'Hide board' : 'Pin board'}
         </button>
       </div>
 
-      {/* Optional Visual Aid */}
-      {showVisual && (
+      {/* Optional Pinned Visual Board */}
+      {showPinnedVisual && (
         <StageVisualDock stageId={stage.id} visualHint={activeVisualHint} />
       )}
 
-      {/* Calm Conversation Area */}
-      <div className="rounded-3xl border border-stone-200/80 bg-white shadow-xs flex flex-col min-h-[460px] max-h-[620px]">
-        <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-7 space-y-4">
-          {stageMessages.map((msg, idx) => {
+      {/* Calm Conversation Stream (Tutor + Inline Visuals + Student) */}
+      <div className="rounded-3xl border border-stone-200/80 bg-white shadow-xs flex flex-col min-h-[500px] max-h-[680px]">
+        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-7 space-y-4">
+          {stageMessages.map((msg) => {
+            if (msg.role === 'visual' && msg.visualHint) {
+              return (
+                <div key={msg.id} className="w-full max-w-xl">
+                  <StageVisualDock
+                    stageId={msg.stageId}
+                    visualHint={msg.visualHint}
+                  />
+                </div>
+              );
+            }
+
             const isTutor = msg.role === 'tutor';
-            const isLast = idx === stageMessages.length - 1;
+            const isLatestTutor = msg.id === latestTutorId;
             return (
               <div
                 key={msg.id}
@@ -120,7 +131,7 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
                 <div
                   className={`max-w-[88%] rounded-2xl px-4 py-3 leading-relaxed ${
                     isTutor
-                      ? isLast
+                      ? isLatestTutor
                         ? 'bg-[#FFFBF3] border border-amber-200/70 text-stone-900 font-display text-base sm:text-lg'
                         : 'bg-[#F8F5EE] text-stone-700 text-sm'
                       : 'bg-stone-900 text-white text-sm'
@@ -157,7 +168,7 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
             type="button"
             disabled={loading}
             onClick={() => onSendTurn('Hint please', 'hint')}
-            title="Get a small hint"
+            title="Show a helpful visual clue"
             className="inline-flex h-11 px-3 items-center gap-1 rounded-2xl border border-stone-200 bg-white text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40 transition cursor-pointer shrink-0"
           >
             <Lightbulb className="h-3.5 w-3.5 text-amber-600" />

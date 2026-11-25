@@ -295,5 +295,37 @@ test('Cognitive fatigue & simplify action offer lighter step without advancing o
   });
   assert.equal(state.learningState.current_question, 17);
   assert.equal(state.learningState.struggle_count, 2);
-  assert.match(t2.tutorMessage.content, /no rush|super light/i);
+  assert.match(t2.tutorMessage.content, /no rush|super light|together/i);
+});
+
+test('Inline Visual Learning: beginner who does not know addition gets interactive visual message in chat', async () => {
+  const state = makeFreshState('beginner-visual');
+  // Initial state starts with Q1 tutor message + Q1 visual message
+  assert.equal(state.messages[0].role, 'tutor');
+  assert.equal(state.messages[1].role, 'visual');
+  assert.equal(state.messages[1].visualHint?.type, 'combine_objects');
+
+  await runSocraticTurn(state, {
+    studentId: 'beginner-visual',
+    stageId: 'stage-1',
+    message: "I don't know what addition is",
+    action: 'answer',
+  });
+
+  const lastMsg = state.messages[state.messages.length - 1];
+  assert.equal(lastMsg.role, 'visual');
+  assert.equal(lastMsg.visualHint?.interactive, true);
+  assert.equal(state.learningState.current_question, 1);
+
+  // Child counts objects from visual and answers "4" -> advances to Q2 (no redundant visual)
+  const prevLen = state.messages.length;
+  await runSocraticTurn(state, {
+    studentId: 'beginner-visual',
+    stageId: 'stage-1',
+    message: '4',
+    action: 'answer',
+  });
+  assert.equal(state.learningState.current_question, 2);
+  const newMsgs = state.messages.slice(prevLen);
+  assert.ok(!newMsgs.some((m) => m.role === 'visual'), 'Should not spam visual on Q2 reflection');
 });

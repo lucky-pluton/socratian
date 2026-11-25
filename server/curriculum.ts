@@ -487,13 +487,16 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     ],
     adaptiveHint:
       'Picture holding 2 chocolates in your left hand and 2 new chocolates in your right hand — count them all together.',
+    showVisualOnAsk: true,
     visualHint: {
-      type: 'chocolates',
+      type: 'combine_objects',
+      objectKind: 'chocolate',
+      operation: 'add',
+      animate: 'merge',
+      interactive: true,
       groupA: 2,
       groupB: 2,
-      labelA: 'First chocolates',
-      labelB: 'Two more',
-      caption: '2 chocolates and 2 more.',
+      caption: 'Tap the chocolates or press Put together to count them',
     },
   },
   {
@@ -522,12 +525,16 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     misconceptions: [],
     adaptiveHint:
       'Think about what your mind or fingers did with the first 2 chocolates and the next 2 chocolates.',
+    showVisualOnAsk: false,
     visualHint: {
-      type: 'chocolates',
+      type: 'combine_objects',
+      objectKind: 'chocolate',
+      operation: 'add',
+      animate: 'merge',
+      interactive: true,
       groupA: 2,
       groupB: 2,
-      labelA: 'First 2',
-      labelB: 'Next 2',
+      caption: 'Watch how the two groups join',
     },
   },
   {
@@ -566,13 +573,16 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     ],
     adaptiveHint:
       'Since you already verified there are 18 in the first pile, what is the very next number after 18?',
+    showVisualOnAsk: true,
     visualHint: {
-      type: 'chocolates',
+      type: 'combine_objects',
+      objectKind: 'chocolate',
+      operation: 'add',
+      animate: 'count_on',
+      interactive: false,
       groupA: 18,
       groupB: 5,
-      labelA: 'Already counted (18)',
-      labelB: '5 more',
-      caption: 'Do you need to recount the 18 from 1?',
+      caption: 'Jar of 18 + 5 more: tap Count from 18',
     },
   },
   {
@@ -609,12 +619,14 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     misconceptions: [],
     adaptiveHint:
       'Compare counting 23 items one by one from 1 versus starting at 18 and counting 19, 20, 21, 22, 23.',
+    showVisualOnAsk: false,
     visualHint: {
-      type: 'chocolates',
+      type: 'combine_objects',
+      objectKind: 'chocolate',
+      operation: 'add',
+      animate: 'count_on',
       groupA: 18,
       groupB: 5,
-      labelA: 'Start at 18',
-      labelB: 'Count forward 5',
     },
   },
 
@@ -652,13 +664,16 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Ask yourself what both your collection and your friend’s collection are made of.',
+    showVisualOnAsk: true,
     visualHint: {
-      type: 'context_blocks',
-      groupA: 5,
+      type: 'combine_objects',
+      objectKind: 'book',
+      operation: 'add',
+      animate: 'merge',
+      interactive: true,
+      groupA: 3,
       groupB: 4,
-      unit: 'books',
-      labelA: 'Your books',
-      labelB: "Friend's books",
+      caption: 'Your books + friend’s books',
     },
   },
   {
@@ -695,6 +710,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'If you have 3 books and 4 balloons, are there 7 books?',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'context_blocks',
       groupA: 3,
@@ -702,6 +718,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       unit: 'books vs balloons',
       labelA: '3 books',
       labelB: '4 balloons',
+      caption: 'Books vs. balloons',
     },
   },
   {
@@ -780,12 +797,16 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Zero more means nobody gave you any extra chocolates — and nobody took any away.',
+    showVisualOnAsk: true,
     visualHint: {
-      type: 'chocolates',
+      type: 'combine_objects',
+      objectKind: 'chocolate',
+      operation: 'add',
+      animate: 'none',
+      interactive: true,
       groupA: 5,
       groupB: 0,
-      labelA: 'Your hand (5)',
-      labelB: 'Empty box (0)',
+      caption: '5 chocolates + empty box (0)',
     },
   },
   {
@@ -848,11 +869,15 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     reasoningKeywords: ['3', '4', '7', 'count', 'combine', 'add', 'together', 'more', 'total'],
     misconceptions: [],
     adaptiveHint: 'Start from 3 chocolates and count forward 4 more.',
+    showVisualOnAsk: true,
     visualHint: {
-      type: 'property_tiles',
+      type: 'commutative_swap',
+      objectKind: 'chocolate',
+      operation: 'swap',
+      animate: 'swap',
       groupA: 3,
       groupB: 4,
-      unit: 'chocolates',
+      caption: '3 chocolates + 4 chocolates — tap Switch order',
     },
   },
   {
@@ -928,12 +953,16 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     reasoningKeywords: ['2', '3', '4', '9', 'add', 'combine', 'count', 'total', 'together'],
     misconceptions: [],
     adaptiveHint: 'Combine any two collections first, then bring in the remaining collection.',
+    showVisualOnAsk: true,
     visualHint: {
-      type: 'property_tiles',
+      type: 'associative_regroup',
+      objectKind: 'apple',
+      operation: 'regroup',
+      animate: 'regroup',
       groupA: 2,
       groupB: 3,
       groupC: 4,
-      unit: 'objects',
+      caption: 'Three groups: 2, 3, and 4 — tap Regroup to test',
     },
   },
   {
@@ -1039,8 +1068,10 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     ],
     adaptiveHint:
       'If you hand over your ₹5 toward the ₹8 you owe, how much debt is still left?',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'bank_ledger',
+      interactive: true,
       start: 5,
       addend: -8,
       unit: '₹',
@@ -1099,6 +1130,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Who needs less money to get back to ₹0 debt?',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'bank_ledger',
       compareA: -3,
@@ -1173,8 +1205,10 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Start with +5, and use + to combine it with the negative change (-8).',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'bank_ledger',
+      interactive: true,
       start: 5,
       addend: -8,
       unit: '₹',
@@ -1204,8 +1238,10 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Use part of the ₹7 to clear the ₹3 debt first — how much remains?',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'bank_ledger',
+      interactive: true,
       start: -3,
       addend: 7,
       unit: '₹',
@@ -1311,6 +1347,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     misconceptions: [],
     adaptiveHint:
       'Look at the number line: where are the smaller numbers and debts like -3 and -8 located compared to 0 and +5?',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'number_line',
       start: 2,
@@ -1375,6 +1412,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Start at -5 and take 3 hops right: -4, -3, and one more...',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'number_line',
       start: -5,
@@ -1419,6 +1457,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Split +7 into the 5 steps that bring you to 0, plus the remaining steps past 0.',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'number_line',
       start: -5,
@@ -1450,8 +1489,10 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Every rupee you receive goes directly toward clearing the ₹5 you owed.',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'bank_ledger',
+      interactive: true,
       start: -5,
       addend: 5,
       unit: '₹',
@@ -1522,6 +1563,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
       },
     ],
     adaptiveHint: 'Test both on the number line: start at -5 and go +5, vs start at +5 and go -5.',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'number_line',
       start: -5,
@@ -1570,6 +1612,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     ],
     adaptiveHint:
       'Try one step at a time: first go from -4°C up by +9°C, then drop 7°C from there.',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'elevation_temp',
       start: -4,
@@ -1662,6 +1705,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     ],
     adaptiveHint:
       'Sea level is 0 m. She uses 12 m of her 15 m swim just to reach the surface — how far above 0 m does she go?',
+    showVisualOnAsk: true,
     visualHint: {
       type: 'number_line',
       start: -12,

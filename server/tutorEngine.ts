@@ -10,6 +10,7 @@ import type {
   TeachingStrategy,
   TutorAssessment,
   TutorTurnRequest,
+  VisualHint,
 } from '../src/types/socratic.js';
 import {
   BADGES,
@@ -63,6 +64,34 @@ const EvaluatorOutputSchema = z.object({
     .string()
     .nullable()
     .describe('Concise summary of the student explanation in their own words when understood.'),
+  visualRequest: z
+    .object({
+      show: z.boolean(),
+      type: z
+        .enum([
+          'combine_objects',
+          'take_away_objects',
+          'context_blocks',
+          'bank_ledger',
+          'number_line',
+          'commutative_swap',
+          'associative_regroup',
+          'elevation_temp',
+        ])
+        .optional(),
+      objectKind: z
+        .enum(['chocolate', 'apple', 'book', 'balloon', 'coin', 'dot'])
+        .optional(),
+      groupA: z.number().optional(),
+      groupB: z.number().optional(),
+      groupC: z.number().optional(),
+      start: z.number().optional(),
+      addend: z.number().optional(),
+      interactive: z.boolean().optional(),
+      caption: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 type EvaluatorOutput = z.infer<typeof EvaluatorOutputSchema>;
@@ -98,6 +127,37 @@ const EVALUATOR_JSON_SCHEMA = {
     bridgeAcknowledgement: { type: 'string' },
     adaptiveFollowUpQuestion: { type: 'string' },
     studentInsightSummary: { type: ['string', 'null'] },
+    visualRequest: {
+      type: ['object', 'null'],
+      properties: {
+        show: { type: 'boolean' },
+        type: {
+          type: 'string',
+          enum: [
+            'combine_objects',
+            'take_away_objects',
+            'context_blocks',
+            'bank_ledger',
+            'number_line',
+            'commutative_swap',
+            'associative_regroup',
+            'elevation_temp',
+          ],
+        },
+        objectKind: {
+          type: 'string',
+          enum: ['chocolate', 'apple', 'book', 'balloon', 'coin', 'dot'],
+        },
+        groupA: { type: 'number' },
+        groupB: { type: 'number' },
+        groupC: { type: 'number' },
+        start: { type: 'number' },
+        addend: { type: 'number' },
+        interactive: { type: 'boolean' },
+        caption: { type: 'string' },
+      },
+      required: ['show'],
+    },
   },
   required: [
     'evaluation',
@@ -358,25 +418,33 @@ export function evaluateDemoResponse(
     };
   }
 
-  // 2. Check explicit "I don't know" / simplify / cognitive fatigue
-  const asksToSimplify = /(simplify|simpler|easier|too hard|confused|lost|slow down|smaller example)/i.test(
+  // 2. Check explicit "I don't know" / "what is addition" / simplify / cognitive fatigue
+  const asksToSimplify = /(simplify|simpler|easier|too hard|confused|lost|slow down|smaller example|what is addition|don't know what addition|never learned|show me)/i.test(
     lower
   );
   if (asksToSimplify || /^(idk|i don'?t know|no idea|not sure|skip|\?+)$/i.test(lower)) {
-    const gentleLine =
-      state.learningState.struggle_count >= 1 || asksToSimplify
-        ? `No rush at all — let's make this super small and easy. ${q.adaptiveHint} Just from that picture, what do you notice?`
-        : `${q.adaptiveHint} What do you think happens here?`;
+    const isBeginnerAddition =
+      q.stageNumber === 1 &&
+      /(what is addition|never learned|don't know)/i.test(lower);
+    const gentleLine = isBeginnerAddition
+      ? 'No problem! Look at the 2 chocolates and 2 more below — tap Put together to count them. How many do you see altogether?'
+      : state.learningState.struggle_count >= 1 || asksToSimplify
+        ? `No rush — let's look at the picture together. ${q.adaptiveHint}`
+        : `${q.adaptiveHint} What do you notice?`;
     return {
       evaluation: 'wrong_or_misconception',
       alternativeValidExplanation: false,
-      whatUnderstood: 'Paused to ask for a simpler view',
-      whatMisunderstood: 'Needs a lighter stepping stone',
+      whatUnderstood: 'Asked to see it visually',
+      whatMisunderstood: 'Needs a gentle visual stepping stone',
       detectedMisconception: null,
       strategyUsed: 'visual_scaffold',
       bridgeAcknowledgement: '',
       adaptiveFollowUpQuestion: gentleLine,
       studentInsightSummary: null,
+      visualRequest: {
+        show: true,
+        interactive: true,
+      },
     };
   }
 
@@ -725,6 +793,15 @@ export async function runSocraticTurn(
       createdAt: new Date().toISOString(),
     };
     state.messages.push(tutorMessage);
+    state.messages.push({
+      id: `msg-vis-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      stageId: q.stageId,
+      questionId: q.id,
+      role: 'visual',
+      content: '',
+      visualHint: { ...q.visualHint, interactive: true },
+      createdAt: new Date().toISOString(),
+    });
     return {
       tutorMessage,
       studentMessage,
@@ -741,7 +818,7 @@ export async function runSocraticTurn(
       stageId: q.stageId,
       questionId: q.id,
       role: 'tutor',
-      content: `No rush at all — let's make this super light. ${q.adaptiveHint} Just looking at that, what do you notice?`,
+      content: `No rush at all — let's look at this together. ${q.adaptiveHint}`,
       assessment: {
         whatUnderstood: 'Asked to simplify the step',
         whatMisunderstood: null,
@@ -757,6 +834,15 @@ export async function runSocraticTurn(
       createdAt: new Date().toISOString(),
     };
     state.messages.push(tutorMessage);
+    state.messages.push({
+      id: `msg-vis-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      stageId: q.stageId,
+      questionId: q.id,
+      role: 'visual',
+      content: '',
+      visualHint: { ...q.visualHint, interactive: true },
+      createdAt: new Date().toISOString(),
+    });
     return {
       tutorMessage,
       studentMessage,
@@ -814,7 +900,8 @@ export async function runSocraticTurn(
 
   const newlyDiscoveredConcepts: ConceptDefinition[] = [];
   let responseText = '';
-  let nextVisualHint = q.visualHint;
+  let nextVisualHint: VisualHint = q.visualHint;
+  let shouldEmitVisual = false;
   let targetQuestionIdForMsg = q.id;
   let targetStageIdForMsg: StageId = q.stageId;
   let assessment: TutorAssessment;
@@ -899,6 +986,7 @@ export async function runSocraticTurn(
       targetQuestionIdForMsg = nextQ.id;
       targetStageIdForMsg = nextQ.stageId;
       nextVisualHint = nextQ.visualHint;
+      shouldEmitVisual = Boolean(nextQ.showVisualOnAsk);
 
       const nextConcept = state.conceptProgress[nextQ.conceptId];
       if (nextConcept && nextConcept.status === 'undiscovered') {
@@ -954,6 +1042,18 @@ export async function runSocraticTurn(
       state.questionsAsked += 1;
     }
 
+    if (evalOut.evaluation === 'wrong_or_misconception') {
+      shouldEmitVisual = true;
+      nextVisualHint = { ...q.visualHint, interactive: true };
+    } else if (evalOut.visualRequest?.show) {
+      shouldEmitVisual = true;
+      nextVisualHint = {
+        ...q.visualHint,
+        ...evalOut.visualRequest,
+        type: evalOut.visualRequest.type ?? q.visualHint.type,
+      };
+    }
+
     responseText = evalOut.adaptiveFollowUpQuestion;
     assessment = {
       whatUnderstood: evalOut.whatUnderstood,
@@ -988,6 +1088,18 @@ export async function runSocraticTurn(
     createdAt: new Date().toISOString(),
   };
   state.messages.push(tutorMessage);
+
+  if (shouldEmitVisual) {
+    state.messages.push({
+      id: `msg-vis-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      stageId: targetStageIdForMsg,
+      questionId: targetQuestionIdForMsg,
+      role: 'visual',
+      content: '',
+      visualHint: nextVisualHint,
+      createdAt: new Date().toISOString(),
+    });
+  }
 
   const newlyEarnedBadges = evaluateBadges(state);
 
