@@ -5,3 +5,5 @@ dist-server/
 .env
 server/data/store.json
 *.log
+
+.vercel
