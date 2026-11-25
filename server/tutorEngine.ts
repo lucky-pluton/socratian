@@ -763,6 +763,15 @@ export async function runSocraticTurn(
       createdAt: new Date().toISOString(),
     };
     state.messages.push(tutorMessage);
+    state.messages.push({
+      id: `msg-vis-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      stageId: req.stageId,
+      questionId: state.learningState.current_question,
+      role: 'visual',
+      content: '',
+      visualHint: getStageById(req.stageId).openingVisualHint,
+      createdAt: new Date().toISOString(),
+    });
     return {
       tutorMessage,
       newlyDiscoveredConcepts: [],
@@ -876,6 +885,15 @@ export async function runSocraticTurn(
       createdAt: new Date().toISOString(),
     };
     state.messages.push(tutorMessage);
+    state.messages.push({
+      id: `msg-vis-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      stageId: q.stageId,
+      questionId: q.id,
+      role: 'visual',
+      content: '',
+      visualHint: { ...q.visualHint, interactive: true },
+      createdAt: new Date().toISOString(),
+    });
     const newlyEarnedBadges = evaluateBadges(state);
     return {
       tutorMessage,
@@ -901,7 +919,7 @@ export async function runSocraticTurn(
   const newlyDiscoveredConcepts: ConceptDefinition[] = [];
   let responseText = '';
   let nextVisualHint: VisualHint = q.visualHint;
-  let shouldEmitVisual = false;
+  let shouldEmitVisual = true;
   let targetQuestionIdForMsg = q.id;
   let targetStageIdForMsg: StageId = q.stageId;
   let assessment: TutorAssessment;
@@ -986,7 +1004,7 @@ export async function runSocraticTurn(
       targetQuestionIdForMsg = nextQ.id;
       targetStageIdForMsg = nextQ.stageId;
       nextVisualHint = nextQ.visualHint;
-      shouldEmitVisual = Boolean(nextQ.showVisualOnAsk);
+      shouldEmitVisual = true;
 
       const nextConcept = state.conceptProgress[nextQ.conceptId];
       if (nextConcept && nextConcept.status === 'undiscovered') {

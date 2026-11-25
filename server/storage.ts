@@ -469,16 +469,14 @@ export function syncLearningPositionToStage(
     createdAt: now,
   };
   state.messages.push(msg);
-  if (q.showVisualOnAsk !== false) {
-    state.messages.push({
-      id: `msg-vis-${stage.id}-q${q.id}-${Date.now()}`,
-      stageId: stage.id,
-      questionId: q.id,
-      role: 'visual',
-      content: '',
-      visualHint: q.visualHint,
-      createdAt: now,
-    });
-  }
+  state.messages.push({
+    id: `msg-vis-${stage.id}-q${q.id}-${Date.now()}`,
+    stageId: stage.id,
+    questionId: q.id,
+    role: 'visual',
+    content: '',
+    visualHint: q.visualHint,
+    createdAt: now,
+  });
   return msg;
 }

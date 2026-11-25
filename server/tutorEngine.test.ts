@@ -317,7 +317,7 @@ test('Inline Visual Learning: beginner who does not know addition gets interacti
   assert.equal(lastMsg.visualHint?.interactive, true);
   assert.equal(state.learningState.current_question, 1);
 
-  // Child counts objects from visual and answers "4" -> advances to Q2 (no redundant visual)
+  // Child counts objects from visual and answers "4" -> advances to Q2 and still receives an inline visual
   const prevLen = state.messages.length;
   await runSocraticTurn(state, {
     studentId: 'beginner-visual',
@@ -327,5 +327,5 @@ test('Inline Visual Learning: beginner who does not know addition gets interacti
   });
   assert.equal(state.learningState.current_question, 2);
   const newMsgs = state.messages.slice(prevLen);
-  assert.ok(!newMsgs.some((m) => m.role === 'visual'), 'Should not spam visual on Q2 reflection');
+  assert.ok(newMsgs.some((m) => m.role === 'visual'), 'Every tutor turn includes an inline visual');
 });
