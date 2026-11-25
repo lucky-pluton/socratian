@@ -233,10 +233,20 @@ export interface TutorTurnRequest {
   clientTurnId?: string;
 }
 
+export interface StageTransition {
+  fromStageId: StageId;
+  fromStageNumber: number;
+  fromStageTitle: string;
+  toStageId: StageId;
+  toStageNumber: number;
+  toStageTitle: string;
+}
+
 export interface TutorTurnResponse {
   tutorMessage: ConversationMessage;
   studentMessage?: ConversationMessage;
   state: StudentState;
   newlyDiscoveredConcepts: ConceptDefinition[];
   newlyEarnedBadges: BadgeDefinition[];
+  stageTransition?: StageTransition | null;
 }

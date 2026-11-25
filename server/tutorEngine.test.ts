@@ -418,3 +418,58 @@ test('Idempotency & Anti-Repetition: duplicate clientTurnId creates only one res
   assert.equal(state.learningState.current_question, 4);
   assert.match(stepNo.tutorMessage.content, /counting forward helps/i);
 });
+
+test('Auto-advances to next uncompleted module once the module question set is answered', async () => {
+  const state = makeFreshState('module-auto-advance');
+  // Student jumps to Stage 3 (Q8, Q9) first
+  syncLearningPositionToStage(state, 'stage-3');
+
+  const r1 = await runSocraticTurn(state, {
+    studentId: 'module-auto-advance',
+    stageId: 'stage-3',
+    message: 'You still have 5 chocolates because nothing was added',
+    action: 'answer',
+  });
+  assert.equal(r1.stageTransition ?? null, null);
+  assert.equal(state.currentStageId, 'stage-3');
+  assert.equal(state.learningState.current_question, 9);
+
+  // Completing Stage 3's set ([8, 9]) automatically moves student into Module 4
+  const r2 = await runSocraticTurn(state, {
+    studentId: 'module-auto-advance',
+    stageId: 'stage-3',
+    message: 'Yes addition still happened because we combined 5 with 0',
+    action: 'answer',
+  });
+  assert.equal(state.currentStageId, 'stage-4');
+  assert.equal(state.learningState.current_stage, 4);
+  assert.equal(state.learningState.current_question, 10);
+  assert.ok(r2.stageTransition);
+  assert.equal(r2.stageTransition?.fromStageId, 'stage-3');
+  assert.equal(r2.stageTransition?.toStageId, 'stage-4');
+  assert.match(r2.tutorMessage.content, /Module 3 complete/i);
+  assert.match(r2.tutorMessage.content, /3 chocolates and then 4/i);
+
+  // Suppose student later completes Stage 1 ([1, 2, 3, 4]) while Stage 3 & Stage 4 ([10, 11, 12]) are already done
+  state.learningState.completed_questions.push(10, 11, 12);
+  const resStage1 = await runSocraticTurn(state, {
+    studentId: 'module-auto-advance',
+    stageId: 'stage-1',
+    message: '4',
+    action: 'answer',
+  });
+  assert.equal(state.learningState.current_question, 2);
+  assert.equal(resStage1.stageTransition ?? null, null);
+
+  state.learningState.completed_questions.push(2, 3);
+  state.learningState.current_question = 4;
+  const finishStage1 = await runSocraticTurn(state, {
+    studentId: 'module-auto-advance',
+    stageId: 'stage-1',
+    message: 'Counting forward saves time by starting at 18',
+    action: 'answer',
+  });
+  // Stage 2 is the next uncompleted module (since 3 & 4 are already done, it goes to 2; if 2 were done, it would skip to 5)
+  assert.equal(state.currentStageId, 'stage-2');
+  assert.equal(finishStage1.stageTransition?.toStageId, 'stage-2');
+});

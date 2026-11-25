@@ -1807,6 +1807,58 @@ export function getNextQuestion(currentQuestionId: number): SequentialQuestion |
   return SEQUENTIAL_QUESTIONS[idx + 1];
 }
 
+export function getNextUncompletedTarget(
+  completedQuestionIds: number[],
+  currentQuestionId: number
+): {
+  nextQuestion?: SequentialQuestion;
+  completedCurrentStage: boolean;
+  nextStage?: StageDefinition;
+} {
+  const completedSet = new Set(completedQuestionIds);
+  const currentQ = getQuestionById(currentQuestionId);
+  const currentStage = getStageById(currentQ.stageId);
+  const currentPosInStage = currentStage.questionIds.indexOf(currentQ.id);
+
+  // 1. Prefer remaining uncompleted questions in the current module (in order)
+  const afterCurrentInStage = currentStage.questionIds
+    .slice(currentPosInStage + 1)
+    .find((qid) => !completedSet.has(qid));
+  const anyRemainingInStage =
+    afterCurrentInStage ??
+    currentStage.questionIds.find((qid) => !completedSet.has(qid));
+
+  if (anyRemainingInStage !== undefined) {
+    return {
+      nextQuestion: getQuestionById(anyRemainingInStage),
+      completedCurrentStage: false,
+    };
+  }
+
+  // 2. Current module's set of questions is fully answered -> advance to next uncompleted module
+  const sortedStages = [...STAGES].sort((a, b) => a.number - b.number);
+  const candidateStages = [
+    ...sortedStages.filter((s) => s.number > currentStage.number),
+    ...sortedStages.filter((s) => s.number < currentStage.number),
+  ];
+
+  for (const stage of candidateStages) {
+    const nextQId = stage.questionIds.find((qid) => !completedSet.has(qid));
+    if (nextQId !== undefined) {
+      return {
+        nextQuestion: getQuestionById(nextQId),
+        completedCurrentStage: true,
+        nextStage: stage,
+      };
+    }
+  }
+
+  return {
+    nextQuestion: undefined,
+    completedCurrentStage: true,
+  };
+}
+
 export function getDailyChallenge(
   dateKey: string,
   completedDate: string | null

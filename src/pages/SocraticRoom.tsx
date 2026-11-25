@@ -63,6 +63,9 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
 
   const ls = state.learningState;
   const totalQuestions = questions.length || 34;
+  const stageDoneCount = stage.questionIds.filter((qid) =>
+    ls.completed_questions.includes(qid)
+  ).length;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -128,14 +131,19 @@ export const SocraticRoom: React.FC<SocraticRoomProps> = ({
             onChange={(e) => onSelectStage(e.target.value as StageId)}
             className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-800 focus:outline-none cursor-pointer"
           >
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>
-                Stage {s.number} of {stages.length}: {s.title}
-              </option>
-            ))}
+            {stages.map((s) => {
+              const sDone = s.questionIds.every((qid) =>
+                ls.completed_questions.includes(qid)
+              );
+              return (
+                <option key={s.id} value={s.id}>
+                  {sDone ? '✓ ' : ''}Module {s.number} of {stages.length}: {s.title}
+                </option>
+              );
+            })}
           </select>
-          <span className="font-math text-[11px] text-stone-400">
-            {ls.completed_questions.length}/{totalQuestions}
+          <span className="font-math text-[11px] text-stone-500">
+            {stageDoneCount}/{stage.questionIds.length} in module · {ls.completed_questions.length}/{totalQuestions} total
           </span>
         </div>
 

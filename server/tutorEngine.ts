@@ -6,6 +6,7 @@ import type {
   ConversationMessage,
   SequentialQuestion,
   StageId,
+  StageTransition,
   StudentState,
   TeachingStrategy,
   TutorAssessment,
@@ -17,7 +18,7 @@ import {
   CONCEPTS,
   SEQUENTIAL_QUESTIONS,
   getConceptById,
-  getNextQuestion,
+  getNextUncompletedTarget,
   getQuestionById,
   getStageById,
 } from './curriculum.js';
@@ -202,7 +203,7 @@ HOW TO SPEAK:
 STRICT SEQUENCE RULES:
 1. Never jump stages or invent a new topic. Follow the current question (#${q.id}).
 2. ${q.requiresReasoning
-      ? 'This step REQUIRES reasoning: if the child gives a bare right answer without explaining why/how, set evaluation="correct_without_reasoning" and ask one short "why/how" question.'
+      ? 'This step REQUIRES reasoning: if the child gives ONLY a bare number/yes/no with no reason, set evaluation="correct_without_reasoning" and ask one short "why/how" question. If they give even a brief valid explanation (e.g. "I added 2 and 2" or "18 is already counted"), set evaluation="understood" immediately.'
       : 'Needs reasoning is FALSE for this step because the next sequential question asks how they got it — so a correct answer (even just a number like "4") MUST be marked evaluation="understood" immediately!'
     }
 3. If the answer is right in part or missing the reason, set evaluation="partial" and ask one NEW gentle follow-up (never repeat a question you already asked in Recent conversation).
@@ -814,6 +815,7 @@ export async function runSocraticTurn(
   studentMessage?: ConversationMessage;
   newlyDiscoveredConcepts: ConceptDefinition[];
   newlyEarnedBadges: BadgeDefinition[];
+  stageTransition?: StageTransition | null;
 }> {
   const now = new Date().toISOString();
 
@@ -827,11 +829,30 @@ export async function runSocraticTurn(
         tutorMessage: existingTutor,
         newlyDiscoveredConcepts: [],
         newlyEarnedBadges: [],
+        stageTransition: null,
       };
     }
   }
   if (req.clientTurnId) {
     state.learningState.last_turn_id = req.clientTurnId;
+  }
+
+  // Keep active question aligned with the module the student is currently answering
+  if (req.action !== 'challenge_start') {
+    const activeQ = getQuestionById(state.learningState.current_question);
+    if (activeQ.stageId !== req.stageId) {
+      const requestedStage = getStageById(req.stageId);
+      const completedSet = new Set(state.learningState.completed_questions);
+      const targetQId =
+        requestedStage.questionIds.find((qid) => !completedSet.has(qid)) ??
+        requestedStage.questionIds[0];
+      state.currentStageId = requestedStage.id;
+      state.learningState.current_stage = requestedStage.number;
+      state.learningState.current_question = targetQId;
+      state.learningState.next_question = targetQId;
+      state.learningState.pending_followup = false;
+      state.learningState.pending_followup_type = null;
+    }
   }
 
   const q = getQuestionById(state.learningState.current_question);
@@ -1035,7 +1056,17 @@ export async function runSocraticTurn(
     evalOut = evaluateDemoResponse(state, q, req.message);
   }
 
+  // Never stall on a reasoning follow-up when this question does not require reasoning
+  if (!q.requiresReasoning && evalOut.evaluation === 'correct_without_reasoning') {
+    evalOut.evaluation = 'understood';
+    evalOut.bridgeAcknowledgement =
+      evalOut.bridgeAcknowledgement?.trim() || 'Right — nice work!';
+    evalOut.studentInsightSummary =
+      evalOut.studentInsightSummary || q.expectedDiscovery;
+  }
+
   const newlyDiscoveredConcepts: ConceptDefinition[] = [];
+  let stageTransition: StageTransition | null = null;
   let responseText = '';
   let nextVisualHint: VisualHint = q.visualHint;
   let shouldEmitVisual = true;
@@ -1113,8 +1144,9 @@ export async function runSocraticTurn(
       state.reasoningScore += 5;
     }
 
-    // 4. Advance deterministically to next sequential question
-    const nextQ = getNextQuestion(q.id);
+    // 4. Advance deterministically within the current module, or move to the next module once its question set is complete
+    const target = getNextUncompletedTarget(state.learningState.completed_questions, q.id);
+    const nextQ = target.nextQuestion;
     if (nextQ) {
       state.learningState.current_question = nextQ.id;
       state.learningState.next_question = nextQ.id;
@@ -1130,10 +1162,34 @@ export async function runSocraticTurn(
         nextConcept.status = 'exploring';
       }
 
-      responseText = `${evalOut.bridgeAcknowledgement.trim()} ${nextQ.prompt}`;
+      if (nextQ.stageId !== q.stageId) {
+        const nextStage = getStageById(nextQ.stageId);
+        stageTransition = {
+          fromStageId: stage.id,
+          fromStageNumber: stage.number,
+          fromStageTitle: stage.title,
+          toStageId: nextStage.id,
+          toStageNumber: nextStage.number,
+          toStageTitle: nextStage.title,
+        };
+
+        // Leave a closing note in the finished module's chat log before entering the next module
+        state.messages.push({
+          id: `msg-tut-done-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          stageId: q.stageId,
+          questionId: q.id,
+          role: 'tutor',
+          content: `${evalOut.bridgeAcknowledgement.trim()} Module ${stage.number} complete — moving to Module ${nextStage.number}: ${nextStage.title}.`,
+          createdAt: now,
+        });
+
+        responseText = `${evalOut.bridgeAcknowledgement.trim()}\n\nModule ${stage.number} complete — now starting Module ${nextStage.number}: ${nextStage.title}.\n\n${nextQ.prompt}`;
+      } else {
+        responseText = `${evalOut.bridgeAcknowledgement.trim()} ${nextQ.prompt}`;
+      }
     } else {
       // Completed the entire 10-stage Addition pathway!
-      responseText = `${evalOut.bridgeAcknowledgement.trim()} You have completed every stage of the Addition Discovery Journey! Would you like to revisit any idea in the Practice Lab or test a custom scenario of your own?`;
+      responseText = `${evalOut.bridgeAcknowledgement.trim()} You have completed every module of the Addition Discovery Journey! Would you like to revisit any idea in the Practice Lab or test a custom scenario of your own?`;
     }
 
     assessment = {
@@ -1265,6 +1321,7 @@ export async function runSocraticTurn(
     studentMessage,
     newlyDiscoveredConcepts,
     newlyEarnedBadges,
+    stageTransition,
   };
 }
 

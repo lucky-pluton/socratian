@@ -25,6 +25,7 @@ import type {
   SequentialQuestion,
   StageDefinition,
   StageId,
+  StageTransition,
   StudentState,
 } from './types/socratic';
 
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
   const [tutorError, setTutorError] = useState<string | null>(null);
   const [celebratedConcepts, setCelebratedConcepts] = useState<ConceptDefinition[]>([]);
   const [celebratedBadges, setCelebratedBadges] = useState<BadgeDefinition[]>([]);
+  const [celebratedTransition, setCelebratedTransition] = useState<StageTransition | null>(null);
   const turnInFlightRef = useRef(false);
 
   const loadAll = useCallback(async () => {
@@ -75,6 +77,7 @@ export const App: React.FC = () => {
   const handleSelectStage = async (stageId: StageId) => {
     if (!state) return;
     setActiveChallengeKind(undefined);
+    setCelebratedTransition(null);
     setTutorError(null);
     const res = await switchStage(studentId, stageId);
     setState(res.state);
@@ -123,9 +126,14 @@ export const App: React.FC = () => {
         clientTurnId,
       });
       setState(res.state);
-      if (res.newlyDiscoveredConcepts.length > 0 || res.newlyEarnedBadges.length > 0) {
+      if (
+        res.newlyDiscoveredConcepts.length > 0 ||
+        res.newlyEarnedBadges.length > 0 ||
+        res.stageTransition
+      ) {
         setCelebratedConcepts(res.newlyDiscoveredConcepts);
         setCelebratedBadges(res.newlyEarnedBadges);
+        setCelebratedTransition(res.stageTransition ?? null);
       }
       if (activeChallengeKind === 'daily' && res.state.dailyChallengeCompletedDate) {
         setDailyChallenge((d) => (d ? { ...d, completed: true } : d));
@@ -208,9 +216,11 @@ export const App: React.FC = () => {
       <CelebrationBanner
         concepts={celebratedConcepts}
         badges={celebratedBadges}
+        stageTransition={celebratedTransition}
         onDismiss={() => {
           setCelebratedConcepts([]);
           setCelebratedBadges([]);
+          setCelebratedTransition(null);
         }}
       />
 
