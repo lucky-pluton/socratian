@@ -1537,7 +1537,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     stageNumber: 10,
     conceptId: 'real_world_modeling',
     prompt:
-      'A mountain camp starts at -4°C, warms up by 9°C by noon, and then drops 7°C by midnight. Which quantities are relevant, how would you represent this using addition, and why does your answer make sense?',
+      'A mountain camp starts at -4°C, warms up 9°C by noon, and then drops 7°C by midnight. What temperature does it reach, and how did you trace it?',
     learningObjective: 'Model multi-step temperature swings with signed addition (-4 + 9 + (-7) = -2°C).',
     expectedDiscovery: '-4 + 9 + (-7) = -2°C, rising past 0°C to +5°C and dropping back below zero.',
     requiresReasoning: true,
@@ -1565,11 +1565,11 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
         keywords: ['12', '20'],
         wrongNumbers: [12, 20],
         simplerExamplePrompt:
-          'Let’s take just the first change: starting at -4°C and warming up by +9°C reaches what temperature at noon?',
+          'Let’s take just one small step first: starting at -4°C and warming up by 9°C reaches what temperature at noon?',
       },
     ],
     adaptiveHint:
-      'Track step by step: first represent warming by +9°C from -4°C, then represent a drop of 7°C as + (-7).',
+      'Try one step at a time: first go from -4°C up by +9°C, then drop 7°C from there.',
     visualHint: {
       type: 'elevation_temp',
       start: -4,
@@ -1584,7 +1584,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     stageNumber: 10,
     conceptId: 'operation_appropriateness',
     prompt:
-      'A bus leaves with 14 passengers, picks up 5 more, and drives 12 km. Someone writes 14 + 5 + 12 to find the total passengers. Which quantities are relevant, which operation applies, and why?',
+      'A bus has 14 passengers, 5 more get on, and it drives 12 km. Someone adds 14 + 5 + 12 to count the passengers — what do you notice?',
     learningObjective: 'Filter irrelevant quantities (12 km) and justify why only 14 + 5 = 19 applies.',
     expectedDiscovery: 'Only 14 and 5 count passengers (14 + 5 = 19); 12 km is distance, not people.',
     requiresReasoning: true,
@@ -1611,10 +1611,10 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
         keywords: ['31'],
         wrongNumbers: [31],
         simplerExamplePrompt:
-          'If 14 people and 5 people are on the bus, and the bus drives 12 kilometers, did 12 new people climb aboard?',
+          'Wait — when the bus drives 12 kilometers down the road, do 12 new people appear in the seats?',
       },
     ],
-    adaptiveHint: 'Check the unit of each number: which numbers actually count people?',
+    adaptiveHint: 'Look at what each number counts: people or distance?',
     visualHint: {
       type: 'context_blocks',
       groupA: 14,
@@ -1630,7 +1630,7 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
     stageNumber: 10,
     conceptId: 'real_world_modeling',
     prompt:
-      'A diver is 12 meters below sea level (-12 m), carries 3 oxygen tanks, and swims up 15 meters (+15 m). Which quantities matter, how do you represent her final position using addition, and why does it make sense?',
+      'A diver at -12 m carries 3 oxygen tanks and swims up 15 m. Where is she now, and which numbers mattered?',
     learningObjective: 'Model signed elevation (-12 + 15 = +3 m) while ignoring irrelevant tank count.',
     expectedDiscovery: '-12 + 15 = +3 m above sea level; 3 oxygen tanks is irrelevant to depth.',
     requiresReasoning: true,
@@ -1657,11 +1657,11 @@ export const SEQUENTIAL_QUESTIONS: SequentialQuestion[] = [
         keywords: ['6', '30'],
         wrongNumbers: [6, 30],
         simplerExamplePrompt:
-          'Does carrying 3 oxygen tanks change how many meters deep she is, or only her depth (-12 m) and swim upward (+15 m)?',
+          'Does carrying 3 oxygen tanks change how deep she is in the water, or only her depth (-12 m) and swim up (+15 m)?',
       },
     ],
     adaptiveHint:
-      'Sea level is 0 m. Use 12 m of her +15 m swim to reach 0 m — how far above 0 m does she continue?',
+      'Sea level is 0 m. She uses 12 m of her 15 m swim just to reach the surface — how far above 0 m does she go?',
     visualHint: {
       type: 'number_line',
       start: -12,
@@ -1732,6 +1732,7 @@ export function createInitialTopicProgress(topic = DEFAULT_TOPIC): TopicLearning
     misconceptions: [],
     pending_followup: false,
     pending_followup_type: null,
+    struggle_count: 0,
     next_question: 1,
     stage_summaries: {},
   };

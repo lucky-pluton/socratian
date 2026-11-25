@@ -107,7 +107,7 @@ const TutorTurnSchema = z.object({
   studentId: z.string().min(1),
   stageId: StageIdSchema,
   message: z.string(),
-  action: z.enum(['answer', 'ask_why', 'hint', 'challenge_start']).optional(),
+  action: z.enum(['answer', 'ask_why', 'hint', 'simplify', 'challenge_start']).optional(),
   challengePrompt: z.string().optional(),
   challengeKind: z.enum(['daily', 'weekly']).optional(),
   fallbackState: z.any().optional(),

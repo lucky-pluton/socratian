@@ -129,39 +129,44 @@ function buildEvaluatorSystemPrompt(
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
-  return `You are the diagnostic evaluator and adaptive phrasing voice of Socratia, a structured Socratic mathematics teacher.
+  return `You are Socratia, a warm, curious mathematics companion helping a child see familiar everyday things in a new way.
 
-STRICT CONVERSATION RULES:
+CORE SPIRIT:
+- Never feel like an exam, textbook, or interrogation. Feel like a friendly conversation full of "Oh! I never thought of it that way!" moments.
+- Keep cognitive load ultra-low: ask ONE short, clear question at a time in everyday words. No dense paragraphs.
+- Sound completely human. NEVER say robotic phrases like "Your answer is partially correct", "Let's proceed to the next learning objective", "You have demonstrated conceptual mastery", or "Based on your response...".
+- Instead use natural phrasing like "Interesting! How did you think of that?", "That's a good observation.", "Look what happens when we change just one thing!", "You just noticed something important.", "Wait, let's look at this differently."
+- When possible, spark an unexpected connection between what the child already knows and a new insight (e.g., how the same addition can clear a debt, leave a debt, or leave extra money).
+- Recognize cognitive fatigue: if struggle_count >= 2 or the child seems tired/confused ("simplify", "don't understand", very short unsure answers), slow down! Use an even smaller, super-familiar example (1 or 2 chocolates, or ₹2) and shorten your question. Never make a child feel unsuccessful for needing a hint.
+
+STRICT PROGRESSION RULES:
 1. Ask exactly ONE primary question per message.
 2. NEVER invent a new stage, jump to a different conceptual stage, or replace the curriculum's next sequential question.
-3. If the student gives a correct numerical/yes-no answer WITHOUT explaining why (when reasoning is expected), classify as "correct_without_reasoning" and ask ONE "why/how" question.
-4. If the answer is correct but reasoning is flawed or incomplete, classify as "partial" and address the reasoning gap with ONE follow-up.
-5. If the answer is incorrect, classify as "wrong_or_misconception", identify the misconception, and ask ONE simpler guiding question or counterexample — NEVER reveal the final answer immediately.
-6. If the student uses a different but mathematically valid explanation, classify as "understood" with alternativeValidExplanation=true.
-7. NEVER introduce mathematical terminology ("Commutative property", "Associative property", "Additive inverse") before the student discovers the concept, unless they explicitly asked for it. ${
+3. If the student gives a correct numerical/yes-no answer WITHOUT explaining why (when reasoning is expected), classify as "correct_without_reasoning" and ask ONE gentle "why/how" question.
+4. If the answer is right in outcome but reasoning is incomplete, classify as "partial" and ask ONE light follow-up.
+5. If the answer is incorrect, classify as "wrong_or_misconception", identify the misconception, and offer ONE simpler, relatable picture — NEVER reveal the final answer immediately.
+6. If the student gives a different but valid explanation, classify as "understood" with alternativeValidExplanation=true.
+7. NEVER introduce mathematical terminology ("Commutative property", "Associative property", "Additive inverse") before discovery unless the child asks. ${
     hideTerm && !isFinalQuestionOfStage
       ? `FORBIDDEN WORDS RIGHT NOW: Do NOT mention "${concept?.discoveredTitle}" yet.`
       : hideTerm && isFinalQuestionOfStage
-        ? `Only if evaluation="understood" on this final discovery question may bridgeAcknowledgement gently introduce the name "${concept?.discoveredTitle}".`
+        ? `Only if evaluation="understood" on this final discovery question may bridgeAcknowledgement gently share "${concept?.discoveredTitle}".`
         : ''
   }
-8. If the student asks an unrelated math/topic doubt, classify as "unrelated_doubt": answer briefly in 1-2 friendly sentences, and end adaptiveFollowUpQuestion by returning directly to the exact pending question: "${q.prompt}"
+8. If the student asks an unrelated doubt, classify as "unrelated_doubt": answer briefly in 1-2 warm sentences, and end adaptiveFollowUpQuestion by returning gently to: "${q.prompt}"
 9. Never assume mastery from a blind guess; require reasoning when requiresReasoning=true.
-10. Keep tone warm, natural, concise, and never robotic.
 
-CURRENT CURRICULUM POSITION:
+CURRENT POSITION:
 - Topic: ${state.learningState.topic}
-- Stage ${stage.number}: ${stage.title}
-- Stage Objective: ${stage.learningObjective}
-- Expected Stage Discovery: ${stage.expectedDiscovery}
+- Stage ${stage.number}: ${stage.title} (${stage.learningObjective})
 - Current Question (#${q.id}): "${q.prompt}"
-- Question Objective: ${q.learningObjective}
-- Expected Answer/Idea: ${q.expectedDiscovery}
+- Expected Idea: ${q.expectedDiscovery}
 - Requires Reasoning: ${q.requiresReasoning}
-- Pending Follow-up Active: ${state.learningState.pending_followup} (${state.learningState.pending_followup_type ?? 'none'})
+- Struggle Count on This Step: ${state.learningState.struggle_count}
+- Pending Follow-up: ${state.learningState.pending_followup} (${state.learningState.pending_followup_type ?? 'none'})
 
-STUDENT'S PRIOR DISCOVERIES / EXPLANATIONS:
-${prevSummaries || 'Just beginning the Addition pathway.'}`;
+STUDENT'S OWN INSIGHTS SO FAR:
+${prevSummaries || 'Just starting out.'}`;
 }
 
 async function callGeminiEvaluator(
@@ -363,17 +368,24 @@ export function evaluateDemoResponse(
     };
   }
 
-  // 2. Check explicit "I don't know" / guessing / stuck
-  if (/^(idk|i don'?t know|no idea|not sure|skip|\?+)$/i.test(lower)) {
+  // 2. Check explicit "I don't know" / simplify / cognitive fatigue
+  const asksToSimplify = /(simplify|simpler|easier|too hard|confused|lost|slow down|smaller example)/i.test(
+    lower
+  );
+  if (asksToSimplify || /^(idk|i don'?t know|no idea|not sure|skip|\?+)$/i.test(lower)) {
+    const gentleLine =
+      state.learningState.struggle_count >= 1 || asksToSimplify
+        ? `No rush at all — let's make this super small and easy. ${q.adaptiveHint} Just from that picture, what do you notice?`
+        : `${q.adaptiveHint} What do you think happens here?`;
     return {
       evaluation: 'wrong_or_misconception',
       alternativeValidExplanation: false,
-      whatUnderstood: 'Unsure how to proceed yet',
-      whatMisunderstood: 'Needs a gentle stepping-stone scaffold',
+      whatUnderstood: 'Paused to ask for a simpler view',
+      whatMisunderstood: 'Needs a lighter stepping stone',
       detectedMisconception: null,
       strategyUsed: 'visual_scaffold',
       bridgeAcknowledgement: '',
-      adaptiveFollowUpQuestion: `${q.adaptiveHint} Looking at that clue, what do you think happens here?`,
+      adaptiveFollowUpQuestion: gentleLine,
       studentInsightSummary: null,
     };
   }
@@ -413,15 +425,19 @@ export function evaluateDemoResponse(
   if (q.acceptedNumbers && nums.length > 0) {
     const hasAccepted = q.acceptedNumbers.some((an) => nums.includes(an));
     if (!hasAccepted && !prevGaveValue) {
+      const tiredPrefix =
+        state.learningState.struggle_count >= 1
+          ? "No worries — let's make it simpler and look at just one small piece."
+          : "Wait, let's look at this differently.";
       return {
         evaluation: 'wrong_or_misconception',
         alternativeValidExplanation: false,
-        whatUnderstood: `Proposed ${nums[0]}`,
-        whatMisunderstood: `Expected value differs from ${nums[0]}`,
-        detectedMisconception: `Misapplied step on Question ${q.id} (answered ${nums[0]})`,
+        whatUnderstood: `Tried ${nums[0]}`,
+        whatMisunderstood: `Different outcome from ${nums[0]}`,
+        detectedMisconception: `Explored ${nums[0]} on Question ${q.id}`,
         strategyUsed: 'visual_scaffold',
         bridgeAcknowledgement: '',
-        adaptiveFollowUpQuestion: `Hmm, let's test ${nums[0]} together! ${q.adaptiveHint} What do you get when you try that step by step?`,
+        adaptiveFollowUpQuestion: `${tiredPrefix} ${q.adaptiveHint} What do you get when you try that?`,
         studentInsightSummary: null,
       };
     }
@@ -473,13 +489,13 @@ export function evaluateDemoResponse(
     return {
       evaluation: 'correct_without_reasoning',
       alternativeValidExplanation: false,
-      whatUnderstood: 'Gave the right answer',
-      whatMisunderstood: 'Has not yet explained why or how it works',
+      whatUnderstood: 'Spotted the right result',
+      whatMisunderstood: 'Has not shared the thinking behind it yet',
       detectedMisconception: null,
       strategyUsed: 'socratic_probe',
       bridgeAcknowledgement: '',
       adaptiveFollowUpQuestion:
-        'You got the right answer! Why does that work — how did you figure it out in your own words?',
+        'Interesting! How did you think of that — why does that happen?',
       studentInsightSummary: null,
     };
   }
@@ -490,12 +506,12 @@ export function evaluateDemoResponse(
       evaluation: 'partial',
       alternativeValidExplanation: false,
       whatUnderstood: 'Found the right number',
-      whatMisunderstood: 'Needs to explain which quantities were relevant and why the answer makes sense',
+      whatMisunderstood: 'Needs to connect which numbers mattered and why',
       detectedMisconception: null,
       strategyUsed: 'socratic_probe',
       bridgeAcknowledgement: '',
       adaptiveFollowUpQuestion:
-        'Good calculation! Which quantities in the story actually mattered here, and why does your result make sense?',
+        "That's a good observation! Which numbers in the story actually mattered here, and why?",
       studentInsightSummary: null,
     };
   }
@@ -506,12 +522,12 @@ export function evaluateDemoResponse(
       return {
         evaluation: 'partial',
         alternativeValidExplanation: false,
-        whatUnderstood: 'Started sharing a thought',
-        whatMisunderstood: 'Explanation is too brief to verify conceptual understanding',
+        whatUnderstood: 'Shared a quick thought',
+        whatMisunderstood: 'Needs a slightly fuller picture',
         detectedMisconception: null,
         strategyUsed: 'socratic_probe',
         bridgeAcknowledgement: '',
-        adaptiveFollowUpQuestion: `Tell me a little more about what you mean! ${q.adaptiveHint}`,
+        adaptiveFollowUpQuestion: `Tell me a little more — ${q.adaptiveHint}`,
         studentInsightSummary: null,
       };
     }
@@ -520,11 +536,11 @@ export function evaluateDemoResponse(
       return {
         evaluation: 'understood',
         alternativeValidExplanation: true,
-        whatUnderstood: 'Shared a thoughtful explanation in own words',
+        whatUnderstood: 'Independent reasoning in own words',
         whatMisunderstood: null,
         detectedMisconception: null,
         strategyUsed: 'concept_synthesis',
-        bridgeAcknowledgement: 'That makes great sense!',
+        bridgeAcknowledgement: buildNaturalBridge(q, text),
         adaptiveFollowUpQuestion: '',
         studentInsightSummary: text.slice(0, 180),
       };
@@ -532,12 +548,12 @@ export function evaluateDemoResponse(
     return {
       evaluation: 'partial',
       alternativeValidExplanation: false,
-      whatUnderstood: 'Engaging with the idea',
-      whatMisunderstood: 'Missing the key connection for this step',
+      whatUnderstood: 'Exploring the idea',
+      whatMisunderstood: 'One small piece is still missing',
       detectedMisconception: null,
       strategyUsed: 'visual_scaffold',
       bridgeAcknowledgement: '',
-      adaptiveFollowUpQuestion: `You're thinking in a good direction. ${q.adaptiveHint} What do you notice?`,
+      adaptiveFollowUpQuestion: `Let's look at one small piece of this together. ${q.adaptiveHint} What do you notice?`,
       studentInsightSummary: null,
     };
   }
@@ -561,16 +577,32 @@ function buildNaturalBridge(q: SequentialQuestion, studentText: string): string 
   const isLastInStage = stage.questionIds[stage.questionIds.length - 1] === q.id;
   const concept = getConceptById(q.conceptId);
 
+  // Unexpected connection & discovery moments
+  const connectionMoments: Record<number, string> = {
+    4: 'You just noticed something really helpful — once you know 18, counting forward turns big piles into a few quick steps!',
+    7: 'Aha! So the same numbers only belong together when they answer the same real-life question.',
+    9: 'Look at that quiet surprise: adding zero changed nothing, yet the act of combining still happened.',
+    12: `Exactly! You already knew 3 + 4 = 7, and now you can see why order didn’t change a single chocolate — mathematicians call that the **${concept?.discoveredTitle ?? 'Commutative Property'}**.`,
+    16: `You just uncovered another hidden pattern: grouping pairs differently never changes what’s in the bags — that’s the **${concept?.discoveredTitle ?? 'Associative Property'}**.`,
+    20: 'You just spotted something surprising about negative numbers: -3 is greater than -8 because owing ₹3 leaves you closer to zero!',
+    23: "So the same addition can clear a debt, leave a debt, or give you money. Isn't that interesting?",
+    28: 'Can you see the connection? Part of +7 simply walks you back to 0, and whatever is left steps into positive numbers.',
+    31: `Look how two ideas connect here: 5 and -5 cancel back to zero in either order — that’s the **${concept?.discoveredTitle ?? 'Additive Inverse'}**!`,
+  };
+
+  if (connectionMoments[q.id]) {
+    return connectionMoments[q.id];
+  }
   if (isLastInStage && concept?.revealNameAfterDiscovery) {
-    return `Exactly right — you just discovered the **${concept.discoveredTitle}** on your own!`;
+    return `You just uncovered something important — that's the **${concept.discoveredTitle}**!`;
   }
   if (isLastInStage) {
-    return `Well reasoned! You've uncovered a key insight: *${stage.expectedDiscovery}*`;
+    return `You just noticed something important: *${stage.expectedDiscovery}*`;
   }
   if (studentText.trim().split(/\s+/).length >= 5) {
-    return 'Nice reasoning — building directly on what you noticed:';
+    return "That's a good observation!";
   }
-  return 'Spot on!';
+  return 'Look what happens when we change just one thing:';
 }
 
 // ============================================================================
@@ -711,6 +743,38 @@ export async function runSocraticTurn(
     };
   }
 
+  if (req.action === 'simplify') {
+    state.learningState.pending_followup = true;
+    state.learningState.struggle_count += 1;
+    const tutorMessage: ConversationMessage = {
+      id: `msg-tut-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      stageId: q.stageId,
+      questionId: q.id,
+      role: 'tutor',
+      content: `No rush at all — let's make this super light. ${q.adaptiveHint} Just looking at that, what do you notice?`,
+      assessment: {
+        whatUnderstood: 'Asked to simplify the step',
+        whatMisunderstood: null,
+        answerCorrect: null,
+        reasoningCorrect: null,
+        activeMisconception: null,
+        misconceptionResolved: false,
+        nextPedagogicalGoal: q.learningObjective,
+        strategyUsed: 'revisit_foundation',
+        understandingDelta: 2,
+      },
+      visualHint: q.visualHint,
+      createdAt: new Date().toISOString(),
+    };
+    state.messages.push(tutorMessage);
+    return {
+      tutorMessage,
+      studentMessage,
+      newlyDiscoveredConcepts: [],
+      newlyEarnedBadges: [],
+    };
+  }
+
   if (req.action === 'ask_why') {
     state.questionsAsked += 1;
     state.reasoningScore += 10;
@@ -720,7 +784,7 @@ export async function runSocraticTurn(
       stageId: q.stageId,
       questionId: q.id,
       role: 'tutor',
-      content: `Great question to ask! ${q.adaptiveHint} Now try applying that intuition back to our question: ${q.prompt}`,
+      content: `I love that curiosity! ${q.adaptiveHint} Seeing it that way, what do you notice about: ${q.prompt}`,
       assessment: {
         whatUnderstood: 'Asked why to understand underlying intuition',
         whatMisunderstood: null,
@@ -777,9 +841,10 @@ export async function runSocraticTurn(
       state.learningState.stage_summaries[`Q${q.id}`] = evalOut.studentInsightSummary;
     }
 
-    // 2. Clear pending follow-up & resolve active misconception if any
+    // 2. Clear pending follow-up & reset fatigue counter
     state.learningState.pending_followup = false;
     state.learningState.pending_followup_type = null;
+    state.learningState.struggle_count = 0;
     if (hadPendingMisconception) {
       state.misconceptionsResolved += 1;
       state.reasoningScore += 20;
@@ -873,6 +938,10 @@ export async function runSocraticTurn(
     // Do NOT advance current_question or stage! Keep sequence intact.
     state.learningState.pending_followup = true;
     state.learningState.next_question = q.id;
+    state.learningState.struggle_count =
+      evalOut.evaluation === 'unrelated_doubt'
+        ? state.learningState.struggle_count
+        : state.learningState.struggle_count + 1;
 
     if (evalOut.evaluation === 'correct_without_reasoning') {
       state.learningState.pending_followup_type = 'reasoning';

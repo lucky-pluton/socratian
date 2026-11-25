@@ -105,7 +105,7 @@ export const App: React.FC = () => {
 
   const handleSendTurn = async (
     message: string,
-    action: 'answer' | 'ask_why' | 'hint' = 'answer'
+    action: 'answer' | 'ask_why' | 'hint' | 'simplify' = 'answer'
   ) => {
     if (!state) return;
     setTutorLoading(true);
@@ -234,6 +234,7 @@ export const App: React.FC = () => {
           error={tutorError}
           onSelectStage={(sid) => void handleSelectStage(sid)}
           onSendTurn={handleSendTurn}
+          onPauseToHome={() => setActiveTab('home')}
           onSaveToJournal={async (title, content) => {
             await handleSaveToJournal({
               stageId: state.currentStageId,

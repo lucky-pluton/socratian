@@ -135,6 +135,9 @@ function normalizeStudent(
   if (!student.learningState.stage_summaries) {
     student.learningState.stage_summaries = {};
   }
+  if (typeof student.learningState.struggle_count !== 'number') {
+    student.learningState.struggle_count = 0;
+  }
   student.topicStates[student.activeTopic] = student.learningState;
   return student;
 }

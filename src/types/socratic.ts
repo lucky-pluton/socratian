@@ -133,6 +133,7 @@ export interface TopicLearningProgress {
     | 'misconception'
     | 'unrelated_doubt'
     | null;
+  struggle_count: number;
   next_question: number;
   stage_summaries: Record<string, string>;
 }
@@ -208,7 +209,7 @@ export interface TutorTurnRequest {
   studentId: string;
   stageId: StageId;
   message: string;
-  action?: 'answer' | 'ask_why' | 'hint' | 'challenge_start';
+  action?: 'answer' | 'ask_why' | 'hint' | 'simplify' | 'challenge_start';
   challengePrompt?: string;
 }
 

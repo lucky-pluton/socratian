@@ -272,3 +272,28 @@ test('Full 10-Stage Addition Journey traverses Q1 through Q34 sequentially witho
   assert.equal(state.learningState.completed_questions.length, 34);
   assert.equal(state.learningState.mastered_concepts.length, CONCEPTS.length);
 });
+
+test('Cognitive fatigue & simplify action offer lighter step without advancing or shaming', async () => {
+  const state = makeFreshState('fatigue-test');
+  syncLearningPositionToStage(state, 'stage-6'); // Q17
+
+  const t1 = await runSocraticTurn(state, {
+    studentId: 'fatigue-test',
+    stageId: 'stage-6',
+    message: "I don't understand",
+    action: 'answer',
+  });
+  assert.equal(state.learningState.current_question, 17);
+  assert.equal(state.learningState.struggle_count, 1);
+  assert.ok(!/partially correct|next learning objective|conceptual mastery/i.test(t1.tutorMessage.content));
+
+  const t2 = await runSocraticTurn(state, {
+    studentId: 'fatigue-test',
+    stageId: 'stage-6',
+    message: 'Can we make this simpler?',
+    action: 'simplify',
+  });
+  assert.equal(state.learningState.current_question, 17);
+  assert.equal(state.learningState.struggle_count, 2);
+  assert.match(t2.tutorMessage.content, /no rush|super light/i);
+});
