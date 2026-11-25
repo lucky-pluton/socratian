@@ -365,16 +365,16 @@ function hasValidReasoningForQuestion(
 
   const bare = isBareShortReply(text);
   const enoughExplanation =
-    !bare && (matched >= 1 || hasConnector || altMatched || wordCount >= 6);
+    !bare && (matched >= 1 || hasConnector || altMatched || wordCount >= 5);
 
-  // On open-ended explanation questions (no fixed number/boolean required), accept concise genuine reasoning like "I counted" or "2 + 2"
-  if (!q.acceptedNumbers && !q.acceptedBoolean && (matched >= 1 || hasConnector || altMatched) && wordCount >= 2) {
+  // On open-ended explanation questions (no fixed number/boolean required), accept concise genuine reasoning like "I counted", "2 + 2", "in my head", "quicker"
+  if (!q.acceptedNumbers && !q.acceptedBoolean && wordCount >= 2 && (matched >= 1 || hasConnector || altMatched || wordCount >= 3)) {
     return { hasReasoning: true, matchedKeywords: matched, alternativeValid: altMatched };
   }
 
-  // If they previously gave the right value and now explain why, lower threshold cleanly
-  if (previousStudentAnswerInFollowup && !bare && wordCount >= 3 && (matched >= 1 || hasConnector || altMatched)) {
-    return { hasReasoning: true, matchedKeywords: matched, alternativeValid: altMatched };
+  // If they previously gave the right value and now explain why in 3+ words (even without exact keyword match), accept natural wording
+  if (previousStudentAnswerInFollowup && !bare && wordCount >= 3) {
+    return { hasReasoning: true, matchedKeywords: matched, alternativeValid: altMatched || matched === 0 };
   }
 
   return {
