@@ -1,0 +1,7 @@
+# Logs & deps
+node_modules/
+dist/
+dist-server/
+.env
+server/data/store.json
+*.log
