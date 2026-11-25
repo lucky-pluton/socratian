@@ -201,11 +201,10 @@ HOW TO SPEAK:
 
 STRICT SEQUENCE RULES:
 1. Never jump stages or invent a new topic. Follow the current question (#${q.id}).
-2. ${
-    q.requiresReasoning
+2. ${q.requiresReasoning
       ? 'This step REQUIRES reasoning: if the child gives a bare right answer without explaining why/how, set evaluation="correct_without_reasoning" and ask one short "why/how" question.'
       : 'Needs reasoning is FALSE for this step because the next sequential question asks how they got it — so a correct answer (even just a number like "4") MUST be marked evaluation="understood" immediately!'
-  }
+    }
 3. If the answer is right in part or missing the reason, set evaluation="partial" and ask one NEW gentle follow-up (never repeat a question you already asked in Recent conversation).
 4. If the answer is wrong, set evaluation="wrong_or_misconception" and offer one simpler everyday picture — never reveal the answer.
 5. If the child gives a different valid reason, or answers a stepping-stone follow-up accurately, set evaluation="understood" with alternativeValidExplanation=true.
@@ -231,7 +230,7 @@ async function callGeminiEvaluator(
 ): Promise<EvaluatorOutput> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error('GEMINI_API_KEY missing');
-  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
   const candidateModels = Array.from(
     new Set([
       primaryModel,
@@ -260,7 +259,7 @@ Evaluate the student's response strictly against Question #${q.id} ("${q.prompt}
 
   for (const model of candidateModels) {
     try {
-      const interaction = await client.interactions.create({
+      const interactionPromise = client.interactions.create({
         model,
         system_instruction: systemInstruction,
         input,
@@ -272,6 +271,11 @@ Evaluate the student's response strictly against Question #${q.id} ("${q.prompt}
         },
       });
 
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout on ${model}`)), 4500)
+      );
+
+      const interaction = await Promise.race([interactionPromise, timeoutPromise]);
       const rawText = interaction.output_text;
       if (!rawText) throw new Error(`Empty response from ${model}`);
       return EvaluatorOutputSchema.parse(JSON.parse(rawText));

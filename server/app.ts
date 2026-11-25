@@ -48,7 +48,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     aiMode: getAiMode(),
-    model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
     supabaseConfigured: Boolean(
       process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
     ),
