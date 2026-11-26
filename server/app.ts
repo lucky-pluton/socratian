@@ -19,7 +19,7 @@ import {
   saveStudentState,
   syncLearningPositionToStage,
 } from './storage.js';
-import { hasGeminiKey, runSocraticTurn } from './tutorEngine.js';
+import { runSocraticTurn } from './tutorEngine.js';
 import type { StageId } from '../src/types/socratic.js';
 
 export const app = express();
@@ -40,15 +40,14 @@ const StageIdSchema = z.enum([
   'stage-10',
 ]);
 
-function getAiMode(): 'gemini' | 'demo' {
-  return hasGeminiKey() ? 'gemini' : 'demo';
+function getTutorMode(): 'curriculum' {
+  return 'curriculum';
 }
 
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    aiMode: getAiMode(),
-    model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+    aiMode: getTutorMode(),
     supabaseConfigured: Boolean(
       process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
     ),
@@ -67,7 +66,7 @@ app.get('/api/curriculum', (_req, res) => {
 app.get('/api/state', async (req, res) => {
   try {
     const studentId = String(req.query.studentId || 'default-student');
-    const state = await loadStudentState(studentId, getAiMode());
+    const state = await loadStudentState(studentId, getTutorMode());
     const today = getTodayKey();
     res.json({
       state,
@@ -91,7 +90,7 @@ app.post('/api/stage', async (req, res) => {
     const parsed = StageSwitchSchema.parse(req.body);
     const state = await loadStudentState(
       parsed.studentId,
-      getAiMode(),
+      getTutorMode(),
       parsed.fallbackState
     );
     syncLearningPositionToStage(state, parsed.stageId);
@@ -119,7 +118,7 @@ app.post('/api/tutor/turn', async (req, res) => {
     const parsed = TutorTurnSchema.parse(req.body);
     const state = await loadStudentState(
       parsed.studentId,
-      getAiMode(),
+      getTutorMode(),
       parsed.fallbackState
     );
 
@@ -165,7 +164,7 @@ const JournalCreateSchema = z.object({
 app.post('/api/journal', async (req, res) => {
   try {
     const parsed = JournalCreateSchema.parse(req.body);
-    const state = await loadStudentState(parsed.studentId, getAiMode());
+    const state = await loadStudentState(parsed.studentId, getTutorMode());
     const entry = {
       id: `journal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       stageId: parsed.stageId as StageId,
@@ -202,7 +201,7 @@ const ChallengeCompleteSchema = z.object({
 app.post('/api/challenge/complete', async (req, res) => {
   try {
     const parsed = ChallengeCompleteSchema.parse(req.body);
-    const state = await loadStudentState(parsed.studentId, getAiMode());
+    const state = await loadStudentState(parsed.studentId, getTutorMode());
     if (parsed.kind === 'daily') {
       state.dailyChallengeCompletedDate = getTodayKey();
       state.reasoningScore += 25;
@@ -226,7 +225,7 @@ app.post('/api/challenge/complete', async (req, res) => {
 app.post('/api/tutor/reset', async (req, res) => {
   try {
     const studentId = String(req.body?.studentId || 'default-student');
-    const state = await resetStudentState(studentId, getAiMode());
+    const state = await resetStudentState(studentId, getTutorMode());
     const today = getTodayKey();
     res.json({
       state,

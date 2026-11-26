@@ -1,6 +1,5 @@
 import React from 'react';
 import { Compass, RotateCcw } from 'lucide-react';
-import type { StudentState } from '../types/socratic';
 
 export type NavTab =
   | 'home'
@@ -13,7 +12,6 @@ export type NavTab =
 interface LayoutProps {
   activeTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
-  state: StudentState;
   onReset: () => void;
   children: React.ReactNode;
 }
@@ -29,7 +27,6 @@ const PRIMARY_NAV: Array<{ id: NavTab; label: string }> = [
 export const Layout: React.FC<LayoutProps> = ({
   activeTab,
   onSelectTab,
-  state,
   onReset,
   children,
 }) => {
@@ -105,7 +102,7 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Quiet Footer (hidden on full-screen Learn tab) */}
       {activeTab !== 'room' && (
         <footer className="py-4 text-center text-[11px] text-stone-400">
-          {state.aiMode === 'gemini' ? 'Gemini AI Tutor' : 'Demo Mode'} ·{' '}
+          Curriculum Mode ·{' '}
           <button
             type="button"
             onClick={() => onSelectTab('progress')}

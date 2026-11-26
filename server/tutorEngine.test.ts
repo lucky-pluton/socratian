@@ -14,7 +14,7 @@ import { runSocraticTurn } from './tutorEngine.js';
 
 function makeFreshState(id: string) {
   const base = createDefaultStudent(id);
-  return { ...base, aiMode: 'demo' as const, persistenceMode: 'local' as const };
+  return { ...base, aiMode: 'curriculum' as const, persistenceMode: 'local' as const };
 }
 
 test('Scenario A: Student answers correctly with sound reasoning -> moves to next sequential question', async () => {
@@ -153,7 +153,7 @@ test('Scenario F: Persisted state resumes from exact saved learning position acr
   });
   await saveStudentState(state);
 
-  const reloaded = await loadStudentState(id, 'demo');
+  const reloaded = await loadStudentState(id, 'curriculum');
   assert.equal(reloaded.learningState.current_stage, 1);
   assert.equal(reloaded.learningState.current_question, 2);
   assert.deepEqual(reloaded.learningState.completed_questions, [1]);

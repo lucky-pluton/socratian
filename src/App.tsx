@@ -210,7 +210,6 @@ export const App: React.FC = () => {
     <Layout
       activeTab={activeTab}
       onSelectTab={setActiveTab}
-      state={state}
       onReset={() => void handleReset()}
     >
       <CelebrationBanner

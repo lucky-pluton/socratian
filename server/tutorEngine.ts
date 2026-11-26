@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-import { z } from 'zod';
 import type {
   BadgeDefinition,
   ConceptDefinition,
@@ -23,273 +21,26 @@ import {
   getStageById,
 } from './curriculum.js';
 
-/**
- * AI Evaluator Output Schema:
- * Note the strict separation of responsibilities:
- * - The AI evaluates the student's response to the CURRENT sequential question,
- *   detects misconceptions, and crafts natural adaptive follow-ups or a warm bridge phrase.
- * - The Curriculum Engine deterministically decides stage/question advancement,
- *   mastery unlocking, and when to return to the original sequence.
- */
-const EvaluatorOutputSchema = z.object({
-  evaluation: z.enum([
-    'understood',
-    'correct_without_reasoning',
-    'partial',
-    'wrong_or_misconception',
-    'unrelated_doubt',
-  ]),
-  alternativeValidExplanation: z.boolean(),
-  whatUnderstood: z.string(),
-  whatMisunderstood: z.string().nullable(),
-  detectedMisconception: z.string().nullable(),
-  strategyUsed: z.enum([
-    'socratic_probe',
-    'counterexample',
-    'real_world_analogy',
-    'visual_scaffold',
-    'concept_synthesis',
-    'revisit_foundation',
-  ]),
-  bridgeAcknowledgement: z
-    .string()
-    .describe(
-      'Short, warm 1-sentence acknowledgement building on what the student said (used ONLY when evaluation=understood before asking the next sequential question). Do NOT include a question here and do NOT reveal terminology before discovery.'
-    ),
-  adaptiveFollowUpQuestion: z
-    .string()
-    .describe(
-      'Used when evaluation is NOT understood. Must be ONE focused Socratic question (or for unrelated_doubt, a 1-2 sentence answer followed by returning to the exact pending question). Never ask multiple unrelated questions and never give away the answer.'
-    ),
-  studentInsightSummary: z
-    .string()
-    .nullable()
-    .describe('Concise summary of the student explanation in their own words when understood.'),
-  visualRequest: z
-    .object({
-      show: z.boolean(),
-      type: z
-        .enum([
-          'combine_objects',
-          'take_away_objects',
-          'context_blocks',
-          'bank_ledger',
-          'number_line',
-          'commutative_swap',
-          'associative_regroup',
-          'elevation_temp',
-        ])
-        .optional(),
-      objectKind: z
-        .enum(['chocolate', 'apple', 'book', 'balloon', 'coin', 'dot'])
-        .optional(),
-      groupA: z.number().optional(),
-      groupB: z.number().optional(),
-      groupC: z.number().optional(),
-      start: z.number().optional(),
-      addend: z.number().optional(),
-      interactive: z.boolean().optional(),
-      caption: z.string().optional(),
-    })
-    .nullable()
-    .optional(),
-});
-
-type EvaluatorOutput = z.infer<typeof EvaluatorOutputSchema>;
-
-const EVALUATOR_JSON_SCHEMA = {
-  type: 'object',
-  properties: {
-    evaluation: {
-      type: 'string',
-      enum: [
-        'understood',
-        'correct_without_reasoning',
-        'partial',
-        'wrong_or_misconception',
-        'unrelated_doubt',
-      ],
-    },
-    alternativeValidExplanation: { type: 'boolean' },
-    whatUnderstood: { type: 'string' },
-    whatMisunderstood: { type: ['string', 'null'] },
-    detectedMisconception: { type: ['string', 'null'] },
-    strategyUsed: {
-      type: 'string',
-      enum: [
-        'socratic_probe',
-        'counterexample',
-        'real_world_analogy',
-        'visual_scaffold',
-        'concept_synthesis',
-        'revisit_foundation',
-      ],
-    },
-    bridgeAcknowledgement: { type: 'string' },
-    adaptiveFollowUpQuestion: { type: 'string' },
-    studentInsightSummary: { type: ['string', 'null'] },
-    visualRequest: {
-      type: ['object', 'null'],
-      properties: {
-        show: { type: 'boolean' },
-        type: {
-          type: 'string',
-          enum: [
-            'combine_objects',
-            'take_away_objects',
-            'context_blocks',
-            'bank_ledger',
-            'number_line',
-            'commutative_swap',
-            'associative_regroup',
-            'elevation_temp',
-          ],
-        },
-        objectKind: {
-          type: 'string',
-          enum: ['chocolate', 'apple', 'book', 'balloon', 'coin', 'dot'],
-        },
-        groupA: { type: 'number' },
-        groupB: { type: 'number' },
-        groupC: { type: 'number' },
-        start: { type: 'number' },
-        addend: { type: 'number' },
-        interactive: { type: 'boolean' },
-        caption: { type: 'string' },
-      },
-      required: ['show'],
-    },
-  },
-  required: [
-    'evaluation',
-    'alternativeValidExplanation',
-    'whatUnderstood',
-    'whatMisunderstood',
-    'detectedMisconception',
-    'strategyUsed',
-    'bridgeAcknowledgement',
-    'adaptiveFollowUpQuestion',
-    'studentInsightSummary',
-  ],
-};
-
-export function hasGeminiKey(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-}
-
-function buildEvaluatorSystemPrompt(
-  state: StudentState,
-  q: SequentialQuestion,
-  isFinalQuestionOfStage: boolean
-): string {
-  const stage = getStageById(q.stageId);
-  const concept = getConceptById(q.conceptId);
-  const hideTerm = Boolean(concept?.revealNameAfterDiscovery);
-
-  const prevSummaries = Object.entries(state.learningState.stage_summaries)
-    .map(([k, v]) => `- ${k}: ${v}`)
-    .join('\n');
-
-  return `You are Socratia, a warm, gentle math companion for children.
-
-HOW TO SPEAK:
-- Keep every reply to 1–2 short sentences. Use simple, everyday words.
-- Ask ONLY ONE short question at a time.
-- Never lecture, never dump formulas, and never use robotic phrases ("partially correct", "learning objective", "conceptual mastery").
-- Use everyday examples (chocolates, books, ₹ rupees, steps).
-- Explain more only if the child asks "why" or seems stuck.
-- If struggle_count >= 1 or the child asks to simplify, use a tiny example (1 or 2 chocolates) and a shorter question.
-
-STRICT SEQUENCE RULES:
-1. Never jump stages or invent a new topic. Follow the current question (#${q.id}).
-2. ${q.requiresReasoning
-      ? 'This step REQUIRES reasoning: if the child gives ONLY a bare number/yes/no with no reason, set evaluation="correct_without_reasoning" and ask one short "why/how" question. If they give even a brief valid explanation (e.g. "I added 2 and 2" or "18 is already counted"), set evaluation="understood" immediately.'
-      : 'Needs reasoning is FALSE for this step because the next sequential question asks how they got it — so a correct answer (even just a number like "4") MUST be marked evaluation="understood" immediately!'
-    }
-3. If the answer is right in part or missing the reason, set evaluation="partial" and ask one NEW gentle follow-up (never repeat a question you already asked in Recent conversation).
-4. If the answer is wrong, set evaluation="wrong_or_misconception" and offer one simpler everyday picture — never reveal the answer.
-5. If the child gives a different valid reason, or answers a stepping-stone follow-up accurately, set evaluation="understood" with alternativeValidExplanation=true.
-6. ${hideTerm && !isFinalQuestionOfStage
-      ? `NEVER mention "${concept?.discoveredTitle}" yet.`
-      : hideTerm && isFinalQuestionOfStage
-        ? `If evaluation="understood", bridgeAcknowledgement may gently name "${concept?.discoveredTitle}" in 1 short sentence.`
-        : 'Keep bridgeAcknowledgement to 1 short warm sentence.'
-    }
-7. For an unrelated question, set evaluation="unrelated_doubt": answer in 1 short sentence, then return gently to: "${q.prompt}"
-
-CURRENT STEP:
-- Stage ${stage.number} (${stage.title}) · Question #${q.id}: "${q.prompt}"
-- Idea: ${q.expectedDiscovery} · Needs reasoning: ${q.requiresReasoning} · Struggle count: ${state.learningState.struggle_count}
-- Prior notes: ${prevSummaries || 'Starting out.'}`;
-}
-
-async function callGeminiEvaluator(
-  state: StudentState,
-  q: SequentialQuestion,
-  req: TutorTurnRequest,
-  isFinalQuestionOfStage: boolean
-): Promise<EvaluatorOutput> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) throw new Error('GEMINI_API_KEY missing');
-  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
-  const candidateModels = Array.from(
-    new Set([
-      primaryModel,
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
-    ])
-  );
-  const client = new GoogleGenAI({ apiKey });
-
-  const recentDialogue = state.messages
-    .filter((m) => m.stageId === q.stageId && m.role !== 'visual')
-    .slice(-10)
-    .map((m) => `${m.role === 'tutor' ? 'Tutor' : 'Student'}: ${m.content}`)
-    .join('\n');
-
-  const input = `Recent conversation in Stage ${q.stageNumber}:
-${recentDialogue || '(Opening question was just asked)'}
-
-Latest student message: "${req.message}"
-
-Evaluate the student's response strictly against Question #${q.id} ("${q.prompt}") and return JSON.`;
-
-  const systemInstruction = buildEvaluatorSystemPrompt(state, q, isFinalQuestionOfStage);
-  let lastError: unknown;
-
-  for (const model of candidateModels) {
-    try {
-      const interactionPromise = client.interactions.create({
-        model,
-        system_instruction: systemInstruction,
-        input,
-        store: false,
-        response_format: {
-          type: 'text',
-          mime_type: 'application/json',
-          schema: EVALUATOR_JSON_SCHEMA,
-        },
-      });
-
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout on ${model}`)), 4500)
-      );
-
-      const interaction = await Promise.race([interactionPromise, timeoutPromise]);
-      const rawText = interaction.output_text;
-      if (!rawText) throw new Error(`Empty response from ${model}`);
-      return EvaluatorOutputSchema.parse(JSON.parse(rawText));
-    } catch (err) {
-      lastError = err;
-      console.warn(`Gemini model ${model} failed, trying fallback if available:`, err instanceof Error ? err.message : err);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('All Gemini models failed');
+interface EvaluatorOutput {
+  evaluation:
+    | 'understood'
+    | 'correct_without_reasoning'
+    | 'partial'
+    | 'wrong_or_misconception'
+    | 'unrelated_doubt';
+  alternativeValidExplanation: boolean;
+  whatUnderstood: string;
+  whatMisunderstood: string | null;
+  detectedMisconception: string | null;
+  strategyUsed: TeachingStrategy;
+  bridgeAcknowledgement: string;
+  adaptiveFollowUpQuestion: string;
+  studentInsightSummary: string | null;
+  visualRequest?: (Partial<VisualHint> & { show: boolean }) | null;
 }
 
 // ============================================================================
-// Deterministic Adaptive Demo Evaluator (Preserves Strict Sequential Progression)
+// Deterministic Curriculum Evaluator (Preserves Strict Sequential Progression)
 // ============================================================================
 
 function matchesWholePhrase(text: string, phrase: string): boolean {
@@ -1043,18 +794,8 @@ export async function runSocraticTurn(
     };
   }
 
-  // Run AI Evaluator (Gemini when configured, else deterministic Adaptive Evaluator)
-  let evalOut: EvaluatorOutput;
-  if (hasGeminiKey()) {
-    try {
-      evalOut = await callGeminiEvaluator(state, q, req, isFinalQuestionOfStage);
-    } catch (err) {
-      console.warn('Gemini evaluator failed, falling back to Demo Evaluator:', err);
-      evalOut = evaluateDemoResponse(state, q, req.message);
-    }
-  } else {
-    evalOut = evaluateDemoResponse(state, q, req.message);
-  }
+  // Evaluate student response against the structured curriculum rules
+  const evalOut = evaluateDemoResponse(state, q, req.message);
 
   // Never stall on a reasoning follow-up when this question does not require reasoning
   if (!q.requiresReasoning && evalOut.evaluation === 'correct_without_reasoning') {

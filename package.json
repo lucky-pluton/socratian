@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Interactive Socratic Mathematics Learning App powered by Gemini AI",
+  "description": "Interactive Socratic Mathematics Learning App powered by structured curriculum data",
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch server/index.ts",
@@ -13,7 +13,6 @@
     "test": "tsx --test server/tutorEngine.test.ts"
   },
   "dependencies": {
-    "@google/genai": "^3.6.1",
     "@supabase/supabase-js": "^2.49.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

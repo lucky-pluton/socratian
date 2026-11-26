@@ -220,7 +220,7 @@ export interface StudentState {
   messages: ConversationMessage[];
   journal: JournalEntry[];
   badges: EarnedBadge[];
-  aiMode: 'gemini' | 'demo';
+  aiMode: 'curriculum' | 'local';
   persistenceMode: 'supabase' | 'local';
 }
 

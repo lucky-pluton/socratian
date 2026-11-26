@@ -191,7 +191,7 @@ function updateStreak(student: Omit<StudentState, 'aiMode' | 'persistenceMode'>)
 
 export async function loadStudentState(
   studentId: string,
-  aiMode: 'gemini' | 'demo',
+  aiMode: 'curriculum' | 'local' = 'curriculum',
   fallbackState?: Omit<StudentState, 'aiMode' | 'persistenceMode'>
 ): Promise<StudentState> {
   const sb = getSupabase();
@@ -410,7 +410,7 @@ export async function saveStudentState(state: StudentState): Promise<void> {
 
 export async function resetStudentState(
   studentId: string,
-  aiMode: 'gemini' | 'demo'
+  aiMode: 'curriculum' | 'local' = 'curriculum'
 ): Promise<StudentState> {
   const fresh = createDefaultStudent(studentId);
   const sb = getSupabase();

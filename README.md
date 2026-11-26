@@ -2,11 +2,11 @@
 
 > **"Don't tell students what mathematics is. Help them discover why it works."**
 
-Socratia is an interactive, AI-powered Socratic mathematics mentor built with **React + TypeScript + Tailwind CSS + Framer Motion** on the frontend and **Node.js + Express + `@google/genai` (Gemini Interactions API) + Supabase** on the backend.
+Socratia is an interactive Socratic mathematics mentor built with **React + TypeScript + Tailwind CSS + Framer Motion** on the frontend and **Node.js + Express + Supabase** on the backend.
 
 ## Key Features
 
-- **Adaptive Socratic AI Mentor**: Asks one question at a time, probes reasoning behind bare numerical answers, catches misconceptions (like `-100 > -1` or mixing mismatched units) with relatable real-world counterexamples, and honors "Ask Why?" at any moment.
+- **Structured Curriculum Engine**: Powered by structured curriculum data in `server/curriculum.ts` and deterministic Socratic evaluation in `server/tutorEngine.ts` (no external AI API key required). Asks one question at a time, probes reasoning behind bare numerical answers, catches misconceptions with relatable real-world examples, and auto-advances when a module's question set is completed.
 - **Complete 6-Stage Addition Journey**:
   1. Discovering Addition (combining, counting forward, when to combine, zero)
   2. Addition Beyond Objects (money, distance, time, context)
@@ -16,7 +16,7 @@ Socratia is an interactive, AI-powered Socratic mathematics mentor built with **
   6. Real-World Mastery (temperature, elevation, multi-step problems, judging when addition applies)
 - **Interactive Visualizations**: Tactile chocolate counting-on explorer, unit/context bar inspector, bank debt comparator, animated number line (`-15` to `+15` and dynamic ranges), pattern tiles, and multi-step temperature/elevation tracker.
 - **6 Main Screens**: Home Dashboard, Socratic Learning Room, Concept Discovery Map, Practice Lab, Reflection Journal, and Progress & Badges Dashboard.
-- **Zero-Config Demo Mode**: Works immediately without API keys via an intelligent backend Socratic reasoning engine, and seamlessly upgrades to live Gemini AI (`gemini-3.8-flash`) and Supabase Postgres when environment variables are provided.
+- **Zero-Config Local Curriculum**: Works immediately without AI API keys via `server/curriculum.ts`, and optionally syncs student progress to Supabase Postgres when configured.
 
 ## Running Locally
 
@@ -33,8 +33,6 @@ npm run dev
 Copy `.env.example` to `.env`:
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-3.8-flash
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 PORT=3001
